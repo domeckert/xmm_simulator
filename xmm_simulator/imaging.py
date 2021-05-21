@@ -7,7 +7,7 @@ from scipy.signal import convolve
 def psf_convole(image, pixsize, xmmsim):
     """
     Convolve an input image with the telescope's on-axis PSF
-    
+
     :param image:
     :param xmmsim:
     :return:

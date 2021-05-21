@@ -162,7 +162,7 @@ class XMMSimulator(object):
                   expmap=expmap,
                   bkgmap=qpb_map)
 
-    def ExtractSpectrum(self, tsim, outname, rin, rout, regfile=None, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractSpectrum(self, tsim, outname, cra, cdec, rin, rout, regfile=None, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
@@ -170,6 +170,10 @@ class XMMSimulator(object):
         :type tsim: float
         :param outname: Name of output files to be written
         :type outname: str
+        :param cra: Right ascension of the center of the annulus
+        :type cra: float
+        :param cdec: Declination of the center of the annulus
+        :type cdec: float
         :param rin: Inner radius of the region in arcmin
         :type rin: float
         :param rout: Outer radius of the region in arcmin
@@ -181,6 +185,8 @@ class XMMSimulator(object):
         print('# Extracting spectrum...')
         box_spec, arf, backscal = gen_spec_box(self,
                                                tsim=tsim,
+                                               cra=cra,
+                                               cdec=cdec,
                                                rin=rin,
                                                rout=rout,
                                                regfile=regfile)

@@ -5,12 +5,14 @@ from threeML.utils.OGIP.response import OGIPResponse
 from scipy.interpolate import interp1d
 from datetime import datetime
 
-def gen_spec_box(xmmsim, tsim, rin, rout, regfile=None, ):
+def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     """
     Generate a predicted spectrum from a box within an annulus
 
     :param xmmsim:
     :param tsim:
+    :param cra:
+    :param cdec:
     :param rin:
     :param rout:
     :param region:
@@ -32,10 +34,19 @@ def gen_spec_box(xmmsim, tsim, rin, rout, regfile=None, ):
     # Set region definition
     y, x = np.indices(box[:, :, 0].shape)
 
-    thetas = np.hypot(x - xmmsim.cx, y - xmmsim.cy) * pixsize  # arcmin
+    wcs = set_wcs(xmmsim=xmmsim)
+
+    wc = np.array([[cra, cdec]])
+
+    pixcrd = wcs.wcs_world2pix(wc, 1)
+
+    xsrc = pixcrd[0][0] - 1.
+
+    ysrc = pixcrd[0][1] - 1.
+
+    thetas = np.hypot(x - xsrc, y - ysrc) * pixsize  # arcmin
 
     if regfile is not None:
-        wcs = set_wcs(xmmsim=xmmsim)
 
         thetas = region(regfile=regfile,
                         thetas=thetas,
