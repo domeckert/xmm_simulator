@@ -1,0 +1,6 @@
+astropy
+matplotlib
+numpy
+pyatomdb
+scipy
+threeML

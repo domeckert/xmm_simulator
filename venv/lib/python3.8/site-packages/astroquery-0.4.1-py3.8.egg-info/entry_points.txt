@@ -1,0 +1,12 @@
+[zest.releaser.postreleaser.before]
+astroquery.release.postreleaser.before = astropy.utils.release:postreleaser_before
+
+[zest.releaser.postreleaser.middle]
+astroquery.release.postreleaser.middle = astropy.utils.release:postreleaser_middle
+
+[zest.releaser.prereleaser.middle]
+astroquery.release.prereleaser.middle = astropy.utils.release:prereleaser_middle
+
+[zest.releaser.releaser.middle]
+astroquery.release.releaser.middle = astropy.utils.release:releaser_middle
+

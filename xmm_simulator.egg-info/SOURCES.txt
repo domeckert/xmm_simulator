@@ -1,0 +1,17 @@
+README.md
+setup.py
+xmm_simulator/__init__.py
+xmm_simulator/background.py
+xmm_simulator/simulator.py
+xmm_simulator/utils.py
+xmm_simulator.egg-info/PKG-INFO
+xmm_simulator.egg-info/SOURCES.txt
+xmm_simulator.egg-info/dependency_links.txt
+xmm_simulator.egg-info/requires.txt
+xmm_simulator.egg-info/top_level.txt
+xmm_simulator/imgs/MOS1_mask.fits.gz
+xmm_simulator/imgs/MOS2_mask.fits.gz
+xmm_simulator/imgs/PN_mask.fits.gz
+xmm_simulator/rmfs/MOS1.rmf
+xmm_simulator/rmfs/MOS2.rmf
+xmm_simulator/rmfs/PN.rmf

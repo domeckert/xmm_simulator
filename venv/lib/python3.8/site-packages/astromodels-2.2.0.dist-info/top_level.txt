@@ -1,0 +1,8 @@
+astromodels
+astromodels/core
+astromodels/functions
+astromodels/functions/dark_matter
+astromodels/sources
+astromodels/tests
+astromodels/utils
+astromodels/xspec

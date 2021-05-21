@@ -1,0 +1,3 @@
+[console_scripts]
+theano-cache = bin.theano_cache:main
+

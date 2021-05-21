@@ -1,0 +1,19 @@
+Metadata-Version: 2.1
+Name: astroquery
+Version: 0.4.1
+Summary: Functions and classes to access online astronomical data resources
+Home-page: http://astropy.org/astroquery
+Author: Adam Ginsburg
+Author-email: 
+License: BSD
+Description: UNKNOWN
+Platform: UNKNOWN
+Requires: numpy
+Requires: astropy
+Requires: requests
+Requires: keyring
+Requires: beautifulsoup4
+Requires: html5lib
+Requires: six
+Provides: astroquery
+Provides-Extra: test

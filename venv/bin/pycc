@@ -1,0 +1,3 @@
+#!/home/deckert/Documents/Work/Heritage/The300/xmm_simulator/venv/bin/python
+from numba.pycc import main
+main()
