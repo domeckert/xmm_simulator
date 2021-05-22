@@ -21,8 +21,6 @@ class XMMSimulator(object):
         :param instrument: Instrument to be simulated (PN, MOS1, or MOS2)
         """
 
-        instrument = 'MOS1'
-
         try:
             if instrument not in ['PN', 'MOS1', 'MOS2']:
                 raise ValueError
