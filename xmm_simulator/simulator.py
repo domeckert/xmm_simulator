@@ -4,11 +4,9 @@ import os
 from astropy.cosmology import FlatLambdaCDM
 import progressbar
 from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum
-from .utils import get_ccf_file_names, calc_arf, save_maps
+from .utils import get_ccf_file_names, calc_arf, save_maps, get_data_file_path
 from .imaging import gen_image_box
 from .spectral import gen_spec_box, save_spectrum
-
-cosmo_elena = FlatLambdaCDM(Om0=0.307114989, H0=67.77)
 
 class XMMSimulator(object):
     """
@@ -23,6 +21,16 @@ class XMMSimulator(object):
         :param instrument: Instrument to be simulated (PN, MOS1, or MOS2)
         """
 
+        instrument = 'MOS1'
+
+        try:
+            if instrument not in ['PN', 'MOS1', 'MOS2']:
+                raise ValueError
+
+        except ValueError:
+            print('ERROR: instrument should be one of PN, MOS1, or MOS2')
+            return
+
         fb = fits.open(boxfile)
 
         self.box = fb[0].data
@@ -36,12 +44,6 @@ class XMMSimulator(object):
         self.box_ene_width = 0.02
 
         self.ccfpath = ccfpath
-
-        try:
-            instrument == 'PN' or instrument=='MOS1' or instrument=='MOS2'
-
-        except TypeError:
-            print('ERROR: instrument should be one of PN, MOS1, or MOS2')
 
         self.instrument = instrument
 
@@ -72,6 +74,18 @@ class XMMSimulator(object):
         self.filter = filter_transf['FILTER-MEDIUM'].data['TRANSMISSION']
 
         filter_transf.close()
+
+        areacorr_file = get_data_file_path('rmfs/mos_areacorr.fits')
+
+        fareacorr = fits.open(areacorr_file)
+
+        areacorr_data = fareacorr['AREACORR'].data
+
+        self.ene_areacorr = areacorr_data['ENERGY']
+
+        self.areacorr = areacorr_data['AREACORR']
+
+        fareacorr.close()
 
         self.cx = None
         self.cy = None

@@ -50,6 +50,14 @@ def calc_arf(theta, ebound_lo, ebound_hi, xmmsim):
 
     area_ebound = farea_interp(ebound)
 
+    if 'MOS' in xmmsim.instrument:
+
+        fareacorr = interp1d(xmmsim.ene_areacorr, xmmsim.areacorr)
+
+        areacorr_ebound = fareacorr(ebound)
+
+        area_ebound = area_ebound * areacorr_ebound
+
     fvig_ebound = interp1d(ene_vig, vig_theta, kind='cubic')
 
     vig_ebound = fvig_ebound(ebound)
