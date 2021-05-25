@@ -11,10 +11,10 @@ area_out_pn = 52.2505
 area_in_m2 = 618.7
 area_out_m2 = area_in_m2 / 3.261834
 
-lhb_ref = 2.73025e-06 # MACS 0949 sky bkg parameters
-ght_ref = 0.261624
-ghn_ref = 5.90513e-07
-cxb_ref = 1.07595e-06
+lhb_ref = 2.92859e-06 # MACS 0949 sky bkg parameters
+ght_ref = 0.220899
+ghn_ref = 5.02297e-07
+cxb_ref = 7.94099e-07
 NH_ref = 0.05
 
 def gen_qpb_spectrum(xmmsim, tsim, area_spec):
