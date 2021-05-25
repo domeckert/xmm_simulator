@@ -4,8 +4,8 @@ import os
 from astropy.cosmology import FlatLambdaCDM
 import progressbar
 from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum
-from .utils import get_ccf_file_names, calc_arf, save_maps, get_data_file_path
-from .imaging import gen_image_box
+from .utils import get_ccf_file_names, calc_arf, get_data_file_path
+from .imaging import gen_image_box, save_maps
 from .spectral import gen_spec_box, save_spectrum
 
 class XMMSimulator(object):
@@ -17,8 +17,11 @@ class XMMSimulator(object):
         Constructor of class XMMSimulator
 
         :param boxfile: Input photon box file
+        :type boxfile: str
         :param ccfpath: Path to calibration file directory
+        :type ccfpath: str
         :param instrument: Instrument to be simulated (PN, MOS1, or MOS2)
+        :type instrument: str
         """
 
         try:
@@ -123,7 +126,7 @@ class XMMSimulator(object):
 
         self.all_arfs = all_arfs
 
-    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract an image in the energy band (elow, ehigh). The image is Poissonized, convolved with PSF, and background is added.
 
@@ -131,10 +134,26 @@ class XMMSimulator(object):
         :type tsim: float
         :param outname: Name used for output FTTS files
         :type outname: str
-        :param elow: Lower energy boundary of the image
+        :param elow: Lower energy boundary of the image (defaults to 0.5)
         :type elow: float
-        :param ehigh: Upper energy boundary of the image
+        :param ehigh: Upper energy boundary of the image (defaults to 2.0)
         :type ehigh: float
+        :param nbin: Number of energy bins into which the calculation will be split for exposure map/vignetting calculation (defaults to 10)
+        :type nbin: int
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
         """
 
         print('# Generating sky background and exposure maps...')
@@ -149,13 +168,18 @@ class XMMSimulator(object):
                                               cxb=cxb,
                                               NH=NH)
 
-        print('# Generating QPB map...')
-        qpb_map = gen_qpb_image(self,
-                                tsim=tsim,
-                                elow=elow,
-                                ehigh=ehigh)
+        if not withskybkg:
+            skybkg_map = skybkg_map * 0.
 
+        if withqpb:
+            print('# Generating QPB map...')
+            qpb_map = gen_qpb_image(self,
+                                    tsim=tsim,
+                                    elow=elow,
+                                    ehigh=ehigh)
 
+        else:
+            qpb_map = skybkg_map * 0.
 
         print('# Generating box image...')
         box_map = gen_image_box(self,
@@ -174,14 +198,14 @@ class XMMSimulator(object):
                   expmap=expmap,
                   bkgmap=qpb_map)
 
-    def ExtractSpectrum(self, tsim, outname, cra, cdec, rin, rout, regfile=None, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
         :param tsim: Exposure time of simulation
         :type tsim: float
-        :param outname: Name of output files to be written
-        :type outname: str
+        :param outdir: Name of output directory
+        :type outdir: str
         :param cra: Right ascension of the center of the annulus
         :type cra: float
         :param cdec: Declination of the center of the annulus
@@ -192,6 +216,20 @@ class XMMSimulator(object):
         :type rout: float
         :param regfile: DS9 region file containing the definition of regions to be excluded
         :type regfile: str
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
         """
 
         print('# Extracting spectrum...')
@@ -205,27 +243,33 @@ class XMMSimulator(object):
 
         area_spec = backscal / 60.**2 * (0.05**2) # arcmin^2
 
-        print('# Extracting FWC spectrum...')
-        qpb_spec = gen_qpb_spectrum(self,
-                                    tsim=tsim,
-                                    area_spec=area_spec)
+        if withqpb:
+            print('# Extracting FWC spectrum...')
+            qpb_spec = gen_qpb_spectrum(self,
+                                        tsim=tsim,
+                                        area_spec=area_spec)
+        else:
+            qpb_spec = box_spec * 0.
 
-        print('# Generating sky background spectrum...')
-        skybkg_spec = gen_skybkg_spectrum(self,
-                                          tsim=tsim,
-                                          area_spec=area_spec,
-                                          arf=arf,
-                                          lhb=lhb,
-                                          ght=ght,
-                                          ghn=ghn,
-                                          cxb=cxb,
-                                          NH=NH)
+        if withskybkg:
+            print('# Generating sky background spectrum...')
+            skybkg_spec = gen_skybkg_spectrum(self,
+                                              tsim=tsim,
+                                              area_spec=area_spec,
+                                              arf=arf,
+                                              lhb=lhb,
+                                              ght=ght,
+                                              ghn=ghn,
+                                              cxb=cxb,
+                                              NH=NH)
+        else:
+            skybkg_spec = box_spec * 0.
 
         spectrum = np.random.poisson(box_spec + skybkg_spec) + qpb_spec # Total spectrum
 
         print('# Now saving spectra and region files...')
         save_spectrum(self,
-                      outname=outname,
+                      outdir=outdir,
                       spectrum=spectrum,
                       tsim=tsim,
                       arf=arf,
