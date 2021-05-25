@@ -168,7 +168,8 @@ def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
     header['CRVAL1'] = 0.
     header['CRVAL2'] = 0.
     today = datetime.date(datetime.now())
-    header['DATE_OBS'] = today.isoformat()
+    header['DATE'] = today.isoformat()
+    header['CREATOR'] = 'xmm_simulator'
     header['TELESCOP'] = 'XMM'
     header['INSTRUME'] = 'E'+xmmsim.instrument
     header['CONTENT'] = 'COUNT MAP'
@@ -178,7 +179,7 @@ def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
 
     hdu.writeto(outname+'.fits', overwrite=True)
 
-    hdu.data = expmap
+    hdu.data = expmap.astype(np.float32)
 
     header['CONTENT'] = 'EXPOSURE MAP'
 
