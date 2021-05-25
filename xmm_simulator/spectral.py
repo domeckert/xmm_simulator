@@ -4,6 +4,7 @@ from .utils import region, set_wcs, get_data_file_path
 from threeML.utils.OGIP.response import OGIPResponse
 from scipy.interpolate import interp1d
 from datetime import datetime
+import os
 
 def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     """
@@ -104,7 +105,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     return spec_conv, arf_mean_interp, backscal_annulus
 
 
-def save_spectrum(xmmsim, outname, spectrum, tsim, arf, qpb, backscal):
+def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal):
     """
 
     :param xmmsim:
@@ -115,6 +116,10 @@ def save_spectrum(xmmsim, outname, spectrum, tsim, arf, qpb, backscal):
     :return:
     """
 
+    if not os.path.exists(outdir):
+
+        os.mkdir(outdir)
+
     rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
 
     rmf = OGIPResponse(rsp_file=rmf_file)
@@ -123,9 +128,22 @@ def save_spectrum(xmmsim, outname, spectrum, tsim, arf, qpb, backscal):
 
     mc_ene = (rmf.monte_carlo_energies[:nchan] + rmf.monte_carlo_energies[1:]) / 2.
 
-    name_spec = outname + '.pi'
-    arf_name = outname + '.arf'
-    bkg_name = outname + '_bkg.pi'
+    pref = None
+    if xmmsim.instrument == 'MOS1':
+        pref = 'mos1S001'
+
+    elif xmmsim.instrument == 'MOS2':
+        pref = 'mos2S002'
+
+    elif xmmsim.instrument == 'PN':
+        pref = 'pnS003'
+
+    name_spec = outdir + '/'+ pref + '-obj-'+ outdir + '.pi'
+    arf_name = outdir + '/'+ pref + '-' + outdir + '.arf'
+    bkg_name = outdir + '/'+ pref + '-back-'+ outdir + '.pi'
+    rmf_name = outdir + '/'+ pref + '-' + outdir + '.rmf'
+
+    os.system('cp %s %s' % (rmf_file, rmf_name))
 
     # Write spectrum
     channel = np.arange(0, len(spectrum), 1)
@@ -137,35 +155,36 @@ def save_spectrum(xmmsim, outname, spectrum, tsim, arf, qpb, backscal):
     cols = fits.ColDefs(cols)
     tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECTRUM')
     hdr = tbhdu.header
-    hdr['HDUCLASS'] = 'OGIP'
-    hdr['HDUCLAS1'] = 'SPECTRUM'
-    hdr['HDUCLAS2'] = 'TOTAL'
-    hdr['HDUCLAS3'] = 'COUNT'
-    hdr['HDUVERS1'] = '1.3.0'
+    hdr['HDUCLASS'] = ('OGIP', 'Format conforms to OGIP/GSFC conventions')
+    hdr['HDUCLAS1'] = ('SPECTRUM', 'File contains a spectrum')
+    hdr['HDUCLAS2'] = ('TOTAL', 'File contains gross counts')
+    hdr['HDUCLAS3'] = ('COUNT', 'Spectrum is stored as counts')
+    hdr['HDUVERS1'] = ('1.1.0', 'Version of format')
     hdr['ORIGIN'] = 'UNIGE'
     hdr['CREATOR'] = 'xmm_simulator'
-    hdr['TELESCOP'] = 'XMM'
-    hdr['INSTRUME'] = 'EPN'
+    hdr['TELESCOP'] = ('XMM', 'Telescope (mission) name')
+    hdr['INSTRUME'] = ('EPN', 'Instrument name')
     hdr['OBS_MODE'] = 'FullFrame'
+    hdr['FILTER'] = ('Medium', 'Instrument filter in use')
     today = datetime.date(datetime.now())
     hdr['DATE'] = today.isoformat()
     hdr['RA_OBJ'] = 0.0
     hdr['DEC_OBJ'] = 0.0
     hdr['DATE-OBS'] = today.isoformat()
     hdr['ONTIME'] = tsim
-    hdr['EXPOSURE'] = tsim
+    hdr['EXPOSURE'] = (tsim, 'Weighted live time of CCDs in the extraction region')
     hdr['CORRFILE'] = 'NONE'
     hdr['CORRSCAL'] = 1.
-    hdr['POISSERR'] = True
+    hdr['POISSERR'] = (True, 'Poisson errors appropriate')
     hdr['QUALITY'] = 0
     hdr['GROUPING'] = 0
-    hdr['RESPFILE'] = rmf_file
-    hdr['ANCRFILE'] = arf_name
-    hdr['BACKFILE'] = bkg_name
-    hdr['CHANTYPE'] = 'PI'
+    hdr['RESPFILE'] = (rmf_name, 'redistribution matrix')
+    hdr['ANCRFILE'] = (arf_name, 'ancillary response')
+    hdr['BACKFILE'] = (bkg_name, 'Background FITS file')
+    hdr['CHANTYPE'] = ('PI', 'Type of channel data')
     hdr['DETCHANS'] = len(channel)
-    hdr['AREASCAL'] = 1.
-    hdr['BACKSCAL'] = backscal  # Sum of area in XMM units, 0.05 arcsec
+    hdr['AREASCAL'] = (1., 'Nominal scaling factor for data')
+    hdr['BACKSCAL'] = (backscal, 'Scaling factor for background')  # Sum of area in XMM units, 0.05 arcsec
     hdr['CTS'] = np.sum(spectrum).astype(int)
     hdul.append(tbhdu)
 
