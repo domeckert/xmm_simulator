@@ -3,6 +3,7 @@ from astropy.io import fits
 from .utils import get_data_file_path, calc_arf
 from scipy.interpolate import interp2d
 from scipy.signal import convolve
+from datetime import datetime
 
 def psf_convole(image, pixsize, xmmsim):
     """
@@ -129,3 +130,66 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
 
     return outima
 
+
+def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
+    """
+    Function to save generated maps into output files
+
+    :param xmmsim: XMMSimulator
+    :param outname: Name of output files
+    :param countmap: Count map
+    :param expmap: Exposure map
+    :param bkgmap: QPB map
+    """
+
+    # Get mask file
+    mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
+
+    inmask = fits.open(mask_file)
+
+    head_mask = inmask[1].header
+
+    mask = inmask[1].data
+
+    npix = mask.shape[0]
+
+    inmask.close()
+
+    hdu = fits.PrimaryHDU(countmap.astype(np.int16))
+
+    header = hdu.header
+
+    header['CDELT1'] = head_mask['CDELT1']
+    header['CDELT2'] = head_mask['CDELT2']
+    header['CTYPE1'] = head_mask['CTYPE1']
+    header['CTYPE2'] = head_mask['CTYPE2']
+    header['CRPIX1'] = head_mask['CRPIX1']
+    header['CRPIX2'] = head_mask['CRPIX2']
+    header['CRVAL1'] = 0.
+    header['CRVAL2'] = 0.
+    today = datetime.date(datetime.now())
+    header['DATE_OBS'] = today.isoformat()
+    header['TELESCOP'] = 'XMM'
+    header['INSTRUME'] = 'E'+xmmsim.instrument
+    header['CONTENT'] = 'COUNT MAP'
+    header['DURATION'] = np.max(expmap)
+
+    hdu.header = header
+
+    hdu.writeto(outname+'.fits', overwrite=True)
+
+    hdu.data = expmap
+
+    header['CONTENT'] = 'EXPOSURE MAP'
+
+    hdu.header = header
+
+    hdu.writeto(outname+'_expo.fits', overwrite=True)
+
+    hdu.data = bkgmap
+
+    header['CONTENT'] = 'QPB MAP'
+
+    hdu.header = header
+
+    hdu.writeto(outname + '_qpb.fits', overwrite=True)
