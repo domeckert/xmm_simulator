@@ -4,6 +4,7 @@ from .utils import get_data_file_path, calc_arf
 from scipy.interpolate import interp2d
 from scipy.signal import convolve
 from datetime import datetime
+import os
 
 def psf_convole(image, pixsize, xmmsim):
     """
@@ -76,6 +77,9 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
     xori = np.arange(0, xmmsim.box.shape[1], 1)
     yori = np.arange(0, xmmsim.box.shape[0], 1)
 
+    pixsize_ori = 30. / xmmsim.box.shape[1] # arcmin
+    print(pixsize_ori)
+
     newima = np.zeros(mask.shape)
 
     cx, cy = npix_out / 2., npix_out / 2.
@@ -105,13 +109,15 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
         ima = np.sum(xmmsim.box[:, :, eband], axis=3)
 
         # Recast box shape into output image shape
-        finterp = interp2d(xori, yori, ima[:, :, 0], kind='linear')
+        cx_ori, cy_ori =  xmmsim.box.shape[1]/2. , xmmsim.box.shape[0]/2.
 
-        xnew = np.arange(0, npix_out, 1) * ima.shape[1] / npix_out
+        finterp = interp2d(yori - cy_ori, xori - cx_ori, ima[:, :, 0], kind='linear')
 
-        ynew = np.arange(0, npix_out, 1) * ima.shape[0] / npix_out
+        xnew = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
 
-        ima_newpix = finterp(xnew, ynew) * ima.shape[0] * ima.shape[1] / (npix_out ** 2) # phot/cm2/s/keV
+        ynew = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
+
+        ima_newpix = finterp(xnew, ynew) * (pixsize / pixsize_ori)**2 # phot/cm2/s/keV
 
         # Compute vignetting curve
         ene_bin = (ene_bins[i] + ene_bins[i + 1]) / 2.
@@ -194,3 +200,80 @@ def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
     hdu.header = header
 
     hdu.writeto(outname + '_qpb.fits', overwrite=True)
+
+
+
+def sum_maps(dir, maps, instruments, pnfact):
+    """
+    Sum maps present within a directory to create a summed EPIC map with weighted exposure map
+
+    :param dir:
+    :param maps:
+    :param instruments:
+    :param pnfact:
+    """
+    os.chdir(dir)
+
+    nmaps = len(maps)
+    print('Summing up %d maps...' % (nmaps))
+
+    ima, expo, qpb = None, None, None
+    fin, fexp, fqpb = None, None, None
+
+    if nmaps>0:
+        name = maps[0].split('.')[0]
+
+        fin = fits.open(maps[0])
+
+        ima = np.copy(fin[0].data)
+
+        fexp = fits.open(name+'_expo.fits')
+
+        if 'MOS' in instruments[0]:
+            expo = fexp[0].data
+        else:
+            expo = fexp[0].data * pnfact
+
+        fqpb = fits.open(name+'_qpb.fits')
+
+        qpb = fqpb[0].data
+
+    for i in range(1,nmaps):
+        name = maps[i].split('.')[0]
+
+        fint = fits.open(maps[i])
+
+        ima = ima + np.copy(fint[0].data)
+
+        fexpt = fits.open(name + '_expo.fits')
+
+        if 'MOS' in instruments[i]:
+            expo = expo + fexpt[0].data
+        else:
+            expo = expo + fexpt[0].data * pnfact
+
+        fqpbt = fits.open(name + '_qpb.fits')
+
+        qpb = qpb + fqpbt[0].data
+
+        fint.close()
+        fexpt.close()
+        fqpbt.close()
+
+    if nmaps>0:
+        fin[0].data = ima
+        fin.writeto('epic.fits', overwrite=True)
+        fin.close()
+
+        fexp[0].data = expo
+        fexp.writeto('epic_expo.fits', overwrite=True)
+        fexp.close()
+
+        fqpb[0].data = qpb
+        fqpb.writeto('epic_qpb.fits', overwrite=True)
+        fqpb.close()
+
+
+
+
+

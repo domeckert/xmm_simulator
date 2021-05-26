@@ -1,8 +1,11 @@
+MANIFEST.in
 README.md
 setup.py
 xmm_simulator/__init__.py
 xmm_simulator/background.py
+xmm_simulator/imaging.py
 xmm_simulator/simulator.py
+xmm_simulator/spectral.py
 xmm_simulator/utils.py
 xmm_simulator.egg-info/PKG-INFO
 xmm_simulator.egg-info/SOURCES.txt
@@ -15,3 +18,4 @@ xmm_simulator/imgs/PN_mask.fits.gz
 xmm_simulator/rmfs/MOS1.rmf
 xmm_simulator/rmfs/MOS2.rmf
 xmm_simulator/rmfs/PN.rmf
+xmm_simulator/rmfs/mos_areacorr.fits

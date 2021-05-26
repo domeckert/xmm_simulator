@@ -233,8 +233,10 @@ def set_wcs(xmmsim):
 
     header = hdu.header
 
-    header['CDELT1'] = head_mask['CDELT1'] * npix_mask / npix_box
-    header['CDELT2'] = head_mask['CDELT2'] * npix_mask / npix_box
+    pixsize_ori = 0.5 / xmmsim.box.shape[1] # degree
+
+    header['CDELT1'] = - pixsize_ori
+    header['CDELT2'] = pixsize_ori
     header['CTYPE1'] = head_mask['CTYPE1']
     header['CTYPE2'] = head_mask['CTYPE2']
     header['CRPIX1'] = head_mask['CRPIX1'] * npix_box / npix_mask
