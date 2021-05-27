@@ -89,7 +89,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     spec_conv = rmf.convolve(spec_interp * bin_width)
 
     # Compute mean ARF and interpolate
-    arf_mean = np.mean(arfs_sel, axis=0)
+    arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
 
     finterp_arf = interp1d(xmmsim.box_ene_mean, arf_mean, fill_value='extrapolate')
 

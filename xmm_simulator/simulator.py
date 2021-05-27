@@ -2,11 +2,11 @@ import numpy as np
 from astropy.io import fits
 import os
 from astropy.cosmology import FlatLambdaCDM
-import progressbar
 from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps
 from .spectral import gen_spec_box, save_spectrum
+from scipy.interpolate import interp1d
 
 class XMMSimulator(object):
     """
@@ -59,6 +59,7 @@ class XMMSimulator(object):
 
         self.nrad = len(self.vignetting[0][1])
         self.rads_vignetting = np.arange(0., 16., self.dtheta)
+        ccf_arf_pn.close()
 
         fqeff = fits.open(ccfpath + self.qe_file)
 
@@ -92,7 +93,6 @@ class XMMSimulator(object):
         self.cy = None
         self.all_arfs = None
 
-
     def ARF_Box(self):
         """
         Compute the ARFs for each point on the box
@@ -108,21 +108,40 @@ class XMMSimulator(object):
         self.cx = cx
         self.cy = cy
 
-        thetas = np.hypot(x - cx, y - cy) * pixsize  # arcmin
+        nthetas = 200
+
+        thetas = np.linspace(0., 22., nthetas)
+
+        theta_image = np.hypot(x - cx, y - cy) * pixsize  # arcmin
 
         nene_ori = self.box.shape[2]
 
         ene_lo, ene_hi = self.box_ene[:nene_ori], self.box_ene[1:]
 
-        all_arfs = np.empty((self.box.shape[0], self.box.shape[1], nene_ori))
+        res = np.empty((nthetas, nene_ori))
 
-        for i in progressbar.progressbar(range(self.box.shape[0])):
+        for i in range(nthetas):
+            if thetas[i]<=15.:
+                res[i, :] = calc_arf(theta=thetas[i],
+                                     ebound_lo=ene_lo,
+                                     ebound_hi=ene_hi,
+                                     xmmsim=self)
+            else:
+                res[i, :] = 0.
 
-            for j in range(self.box.shape[1]):
+        finterp = interp1d(thetas, res, axis=0)
 
-                if thetas[j, i] <= np.max(self.rads_vignetting):
+        all_arfs = finterp(theta_image)
 
-                    all_arfs[j, i, :] = calc_arf(thetas[j, i], ene_lo, ene_hi, self)
+        # all_arfs = np.empty((self.box.shape[0], self.box.shape[1], nene_ori))
+        #
+        # for i in progressbar.progressbar(range(self.box.shape[0])):
+        #
+        #     for j in range(self.box.shape[1]):
+        #
+        #         if thetas[j, i] <= np.max(self.rads_vignetting):
+        #
+        #             all_arfs[j, i, :] = calc_arf(thetas[j, i], ene_lo, ene_hi, self)
 
         self.all_arfs = all_arfs
 
