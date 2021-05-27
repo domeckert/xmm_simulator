@@ -145,7 +145,7 @@ class XMMSimulator(object):
 
         self.all_arfs = all_arfs
 
-    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None, write_arf=False):
         """
         Extract an image in the energy band (elow, ehigh). The image is Poissonized, convolved with PSF, and background is added.
 
@@ -201,7 +201,7 @@ class XMMSimulator(object):
             qpb_map = skybkg_map * 0.
 
         print('# Generating box image...')
-        box_map = gen_image_box(self,
+        box_map, arf_onaxis = gen_image_box(self,
                                 tsim=tsim,
                                 elow=elow,
                                 ehigh=ehigh,
@@ -215,7 +215,9 @@ class XMMSimulator(object):
                   outname=outname,
                   countmap=poisson_map,
                   expmap=expmap,
-                  bkgmap=qpb_map)
+                  bkgmap=qpb_map,
+                  write_arf=write_arf,
+                  arf_onaxis=arf_onaxis)
 
     def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """

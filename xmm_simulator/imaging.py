@@ -5,6 +5,7 @@ from scipy.interpolate import interp2d
 from scipy.signal import convolve
 from datetime import datetime
 import os
+from threeML.utils.OGIP.response import OGIPResponse
 
 def psf_convole(image, pixsize, xmmsim):
     """
@@ -78,7 +79,6 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
     yori = np.arange(0, xmmsim.box.shape[0], 1)
 
     pixsize_ori = 30. / xmmsim.box.shape[1] # arcmin
-    print(pixsize_ori)
 
     newima = np.zeros(mask.shape)
 
@@ -134,10 +134,10 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
 
     outima = blurred * mask
 
-    return outima
+    return outima, arf_onaxis
 
 
-def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
+def save_maps(xmmsim, outname, countmap, expmap, bkgmap, write_arf=False, arf_onaxis=None):
     """
     Function to save generated maps into output files
 
@@ -200,6 +200,40 @@ def save_maps(xmmsim, outname, countmap, expmap, bkgmap):
     hdu.header = header
 
     hdu.writeto(outname + '_qpb.fits', overwrite=True)
+
+    if write_arf and arf_onaxis is not None:
+        # Write ARF
+        rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
+
+        rmf = OGIPResponse(rsp_file=rmf_file)
+
+        nchan = len(rmf.monte_carlo_energies) - 1
+        mc_ene_lo = rmf.monte_carlo_energies[:nchan]
+        mc_ene_hi = rmf.monte_carlo_energies[1:]
+
+        hdul = fits.HDUList([fits.PrimaryHDU()])
+        cols = []
+        cols.append(fits.Column(name='ENERG_LO', format='J', unit='keV', array=mc_ene_lo))
+        cols.append(fits.Column(name='ENERG_HI', format='J', unit='keV', array=mc_ene_hi))
+        cols.append(fits.Column(name='SPECRESP', format='J', unit='cm2', array=arf_onaxis))
+        cols = fits.ColDefs(cols)
+        tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECRESP')
+        hdr = tbhdu.header
+        hdr['ARFVERSN'] = '1992a'
+        hdr['HDUCLASS'] = 'OGIP'
+        hdr['HDUCLAS1'] = 'RESPONSE'
+        hdr['HDUCLAS2'] = 'SPECRESP'
+        hdr['HDUVERS1'] = '1.3.0'
+        hdr['ORIGIN'] = 'UNIGE'
+        hdr['CREATOR'] = 'xmm_simulator'
+        hdr['TELESCOP'] = 'XMM'
+        hdr['INSTRUME'] = 'EPN'
+        hdr['OBS_MODE'] = 'FullFrame'
+        hdr['FILTER'] = 'Medium'
+        hdr['DATE'] = today.isoformat()
+        hdul.append(tbhdu)
+
+        hdul.writeto(outname+'.arf', overwrite=True)
 
 
 
