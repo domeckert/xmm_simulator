@@ -123,6 +123,8 @@ def gen_qpb_image(xmmsim, tsim, elow=0.5, ehigh=2.0):
 
     bkg_map = mask * rate_phot * pixsize ** 2 * tsim
 
+    fwc_file.close()
+
     inmask.close()
 
     return bkg_map
@@ -188,6 +190,9 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     bin_width = rmf.monte_carlo_energies[1:] - rmf.monte_carlo_energies[:nchan]
 
     spec_conv = rmf.convolve(spec_phot * bin_width)
+
+    modlhb.clean()
+    modgh.clean()
 
     return spec_conv
 
@@ -299,6 +304,9 @@ def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=N
     expmap = expmap * mask
 
     bkg_map = bkg_map * mask
+
+    modlhb.clean()
+    modgh.clean()
 
     return  bkg_map, expmap
 
