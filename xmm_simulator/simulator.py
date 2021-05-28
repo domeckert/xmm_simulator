@@ -219,7 +219,7 @@ class XMMSimulator(object):
                   write_arf=write_arf,
                   arf_onaxis=arf_onaxis)
 
-    def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
@@ -272,6 +272,16 @@ class XMMSimulator(object):
         else:
             qpb_spec = box_spec * 0.
 
+        if tsim_qpb is not None:
+            print('# Extracting FWC spectrum with different exposure time...')
+            qpb_spec_out = gen_qpb_spectrum(self,
+                                        tsim=tsim_qpb,
+                                        area_spec=area_spec)
+        else:
+            tsim_qpb = tsim
+            qpb_spec_out = qpb_spec
+
+
         if withskybkg:
             print('# Generating sky background spectrum...')
             skybkg_spec = gen_skybkg_spectrum(self,
@@ -294,5 +304,7 @@ class XMMSimulator(object):
                       spectrum=spectrum,
                       tsim=tsim,
                       arf=arf,
-                      qpb=qpb_spec,
-                      backscal=backscal)
+                      qpb=qpb_spec_out,
+                      backscal=backscal,
+                      tsim_qpb=tsim_qpb)
+

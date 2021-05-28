@@ -105,7 +105,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     return spec_conv, arf_mean_interp, backscal_annulus
 
 
-def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal):
+def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
     """
 
     :param xmmsim:
@@ -202,6 +202,8 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal):
     tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECTRUM')
     hdr['ANCRFILE'] = 'none'
     hdr['BACKFILE'] = 'none'
+    hdr['EXPOSURE'] = tsim_qpb
+    hdr['ONTIME'] = tsim_qpb
     tbhdu.header = hdr
     hdul.append(tbhdu)
 
