@@ -3,7 +3,7 @@ import numpy as np
 from .utils import get_data_file_path, calc_arf, region
 from threeML import APEC, Powerlaw, PhAbs
 from threeML.utils.OGIP.response import OGIPResponse
-from scipy.interpolate import interp2d
+from scipy.ndimage import gaussian_filter1d
 
 area_in_pn = 610.9
 area_out_pn = 52.2505
@@ -68,14 +68,18 @@ def gen_qpb_spectrum(xmmsim, tsim, area_spec):
 
     nchan = len(emin)
 
-    spec_bkg = np.empty(nchan)
+    spec_bkg, spec_rate, bin_width = np.empty(nchan), np.empty(nchan), np.empty(nchan)
 
     for i in range(nchan):
         sel_chan = np.where(np.logical_and(evtlist_sel['PI'] >= emin[i] * 1000, evtlist_sel['PI'] < emax[i] * 1000))
 
-        spec_bkg[i] = len(sel_chan[0])
+        bin_width[i] = emax[i] - emin[i]
 
-    spec_bkg = spec_bkg.astype(int)
+        spec_rate[i] = len(sel_chan[0]) / sum_expo / bin_width[i] # cts/s/keV
+
+    spec_rate_smoothed = gaussian_filter1d(spec_rate, 5.)
+
+    spec_bkg = np.random.poisson(spec_rate_smoothed * sum_expo * bin_width).astype(int)
 
     return spec_bkg
 
