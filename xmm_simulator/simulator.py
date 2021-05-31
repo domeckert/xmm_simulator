@@ -2,7 +2,7 @@ import numpy as np
 from astropy.io import fits
 import os
 from astropy.cosmology import FlatLambdaCDM
-from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum
+from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps
 from .spectral import gen_spec_box, save_spectrum
@@ -92,6 +92,8 @@ class XMMSimulator(object):
         self.cx = None
         self.cy = None
         self.all_arfs = None
+        self.fwc_spec = None
+        self.ebounds = None
 
     def ARF_Box(self):
         """
@@ -219,6 +221,14 @@ class XMMSimulator(object):
                   write_arf=write_arf,
                   arf_onaxis=arf_onaxis)
 
+    def ExtractFWC(self):
+        """
+        Determine the spectral shape of the FWC spectrum
+        """
+
+        self.fwc_spec, self.ebounds = gen_qpb_spectrum(self)
+
+
     def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
@@ -264,23 +274,33 @@ class XMMSimulator(object):
 
         area_spec = backscal / 60.**2 * (0.05**2) # arcmin^2
 
+        area_tot = tot_area(self)
+
+        emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+
+        bin_width = emax - emin
+
         if withqpb:
-            print('# Extracting FWC spectrum...')
-            qpb_spec = gen_qpb_spectrum(self,
-                                        tsim=tsim,
-                                        area_spec=area_spec)
+            if self.fwc_spec is None:
+                print('Please extract the FWC spectrum first')
+                qpb_spec = box_spec * 0.
+
+            else:
+                print('# Extracting FWC spectrum...')
+
+                qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
         else:
             qpb_spec = box_spec * 0.
 
         if tsim_qpb is not None:
             print('# Extracting FWC spectrum with different exposure time...')
-            qpb_spec_out = gen_qpb_spectrum(self,
-                                        tsim=tsim_qpb,
-                                        area_spec=area_spec)
+
+            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(int)
+
         else:
             tsim_qpb = tsim
-            qpb_spec_out = qpb_spec
 
+            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
 
         if withskybkg:
             print('# Generating sky background spectrum...')

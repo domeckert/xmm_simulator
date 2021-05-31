@@ -17,7 +17,16 @@ ghn_ref = 5.02297e-07
 cxb_ref = 7.94099e-07
 NH_ref = 0.05
 
-def gen_qpb_spectrum(xmmsim, tsim, area_spec):
+def tot_area(xmmsim):
+    if xmmsim.instrument == 'PN':
+        area_tot = area_in_pn + area_out_pn
+
+    else:
+        area_tot = area_in_m2 + area_out_m2
+
+    return area_tot
+
+def gen_qpb_spectrum(xmmsim):
     """
     Generate a filter-wheel-closed spectrum for a given observation time and source area
 
@@ -43,35 +52,23 @@ def gen_qpb_spectrum(xmmsim, tsim, area_spec):
     nevt_tot = len(okflag[0])
 
     if xmmsim.instrument == 'PN':
-        area_tot = area_in_pn + area_out_pn
 
         sum_expo = np.sum(exp_fwc['EXPOSURE']) / 12. # PN has 12 chips
 
     else:
-        area_tot = area_in_m2 + area_out_m2
 
         sum_expo = np.sum(exp_fwc['EXPOSURE']) / 7. # MOS has 7 chips
-
-    nevt_rat = nevt_tot * tsim / sum_expo * area_spec / area_tot
-
-    nevt_sim = np.random.poisson(nevt_rat)
-
-    rand_evt = np.random.rand(nevt_sim) * nevt_sim
-
-    sel_evt = (rand_evt.astype(int))
-
-    evt_okflag = evts_fwc[okflag]
-
-    evtlist_sel = evt_okflag[sel_evt]
 
     emin, emax = ebounds['E_MIN'], ebounds['E_MAX']
 
     nchan = len(emin)
 
-    spec_bkg, spec_rate, bin_width = np.empty(nchan), np.empty(nchan), np.empty(nchan)
+    spec_rate, bin_width = np.empty(nchan), np.empty(nchan)
+
+    evt_okflag = evts_fwc[okflag]
 
     for i in range(nchan):
-        sel_chan = np.where(np.logical_and(evtlist_sel['PI'] >= emin[i] * 1000, evtlist_sel['PI'] < emax[i] * 1000))
+        sel_chan = np.where(np.logical_and(evt_okflag['PI'] >= emin[i] * 1000, evt_okflag['PI'] < emax[i] * 1000))
 
         bin_width[i] = emax[i] - emin[i]
 
@@ -79,9 +76,7 @@ def gen_qpb_spectrum(xmmsim, tsim, area_spec):
 
     spec_rate_smoothed = gaussian_filter1d(spec_rate, 5.)
 
-    spec_bkg = np.random.poisson(spec_rate_smoothed * sum_expo * bin_width).astype(int)
-
-    return spec_bkg
+    return spec_rate_smoothed, ebounds
 
 
 def gen_qpb_image(xmmsim, tsim, elow=0.5, ehigh=2.0):
