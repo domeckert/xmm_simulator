@@ -36,12 +36,6 @@ def gen_qpb_spectrum(xmmsim):
     :return: spec_bkg: Background QPB spectrum
     """
 
-    rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
-
-    frmf = fits.open(rmf_file)
-    ebounds = frmf['EBOUNDS'].data
-    frmf.close()
-
     fwc_file = fits.open(xmmsim.ccfpath + xmmsim.fwc_file)
 
     evts_fwc = fwc_file[1].data
@@ -59,7 +53,7 @@ def gen_qpb_spectrum(xmmsim):
 
         sum_expo = np.sum(exp_fwc['EXPOSURE']) / 7. # MOS has 7 chips
 
-    emin, emax = ebounds['E_MIN'], ebounds['E_MAX']
+    emin, emax = xmmsim.ebounds['E_MIN'], xmmsim.ebounds['E_MAX']
 
     nchan = len(emin)
 

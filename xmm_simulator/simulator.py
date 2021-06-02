@@ -89,11 +89,17 @@ class XMMSimulator(object):
 
         fareacorr.close()
 
+        rmf_file = get_data_file_path('rmfs/%s.rmf' % (instrument))
+
+        frmf = fits.open(rmf_file)
+        ebounds = frmf['EBOUNDS'].data
+        frmf.close()
+        self.ebounds = ebounds
+
         self.cx = None
         self.cy = None
         self.all_arfs = None
         self.fwc_spec = None
-        self.ebounds = None
 
     def ARF_Box(self):
         """
@@ -226,7 +232,7 @@ class XMMSimulator(object):
         Determine the spectral shape of the FWC spectrum
         """
 
-        self.fwc_spec, self.ebounds = gen_qpb_spectrum(self)
+        self.fwc_spec = gen_qpb_spectrum(self)
 
 
     def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
@@ -289,18 +295,23 @@ class XMMSimulator(object):
                 print('# Extracting FWC spectrum...')
 
                 qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+
+            if tsim_qpb is not None:
+                print('# Extracting FWC spectrum with different exposure time...')
+
+                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(
+                    int)
+
+            else:
+                tsim_qpb = tsim
+
+                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+
         else:
             qpb_spec = box_spec * 0.
 
-        if tsim_qpb is not None:
-            print('# Extracting FWC spectrum with different exposure time...')
+            qpb_spec_out = qpb_spec
 
-            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(int)
-
-        else:
-            tsim_qpb = tsim
-
-            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
 
         if withskybkg:
             print('# Generating sky background spectrum...')
