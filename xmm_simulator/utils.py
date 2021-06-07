@@ -51,7 +51,7 @@ def calc_arf(theta, ebound_lo, ebound_hi, xmmsim):
 
     if 'MOS' in xmmsim.instrument:
 
-        fareacorr = interp1d(xmmsim.ene_areacorr, xmmsim.areacorr)
+        fareacorr = interp1d(xmmsim.ene_areacorr, xmmsim.areacorr, kind='linear', fill_value='extrapolate')
 
         areacorr_ebound = fareacorr(ebound)
 

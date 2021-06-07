@@ -224,8 +224,7 @@ class XMMSimulator(object):
                   countmap=poisson_map,
                   expmap=expmap,
                   bkgmap=qpb_map,
-                  write_arf=write_arf,
-                  arf_onaxis=arf_onaxis)
+                  write_arf=write_arf)
 
     def ExtractFWC(self):
         """
