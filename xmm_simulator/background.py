@@ -70,7 +70,7 @@ def gen_qpb_spectrum(xmmsim):
 
     spec_rate_smoothed = gaussian_filter1d(spec_rate, 5.)
 
-    return spec_rate_smoothed, ebounds
+    return spec_rate_smoothed
 
 
 def gen_qpb_image(xmmsim, tsim, elow=0.5, ehigh=2.0):

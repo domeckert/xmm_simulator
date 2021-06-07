@@ -134,10 +134,10 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
 
     outima = blurred * mask
 
-    return outima, arf_onaxis
+    return outima
 
 
-def save_maps(xmmsim, outname, countmap, expmap, bkgmap, write_arf=False, arf_onaxis=None):
+def save_maps(xmmsim, outname, countmap, expmap, bkgmap, write_arf=False):
     """
     Function to save generated maps into output files
 
@@ -201,15 +201,16 @@ def save_maps(xmmsim, outname, countmap, expmap, bkgmap, write_arf=False, arf_on
 
     hdu.writeto(outname + '_qpb.fits', overwrite=True)
 
-    if write_arf and arf_onaxis is not None:
+    if write_arf:
         # Write ARF
         rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
-
         rmf = OGIPResponse(rsp_file=rmf_file)
 
         nchan = len(rmf.monte_carlo_energies) - 1
         mc_ene_lo = rmf.monte_carlo_energies[:nchan]
         mc_ene_hi = rmf.monte_carlo_energies[1:]
+
+        arf_onaxis = calc_arf(theta=0.0, ebound_lo=mc_ene_lo, ebound_hi=mc_ene_hi, xmmsim=xmmsim)
 
         hdul = fits.HDUList([fits.PrimaryHDU()])
         cols = []

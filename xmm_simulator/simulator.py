@@ -209,7 +209,7 @@ class XMMSimulator(object):
             qpb_map = skybkg_map * 0.
 
         print('# Generating box image...')
-        box_map, arf_onaxis = gen_image_box(self,
+        box_map = gen_image_box(self,
                                 tsim=tsim,
                                 elow=elow,
                                 ehigh=ehigh,
