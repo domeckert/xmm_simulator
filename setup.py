@@ -12,6 +12,6 @@ setup(
       install_requires=[
             'numpy','scipy','astropy','matplotlib','pyatomdb','threeML',
       ],
-      package_data={'xmm_simulator': ['rmfs/*', 'imgs/*']},
+      package_data={'xmm_simulator': ['rmfs/*', 'imgs/*', 'fwc/*']},
 )
 
