@@ -2,7 +2,7 @@ import numpy as np
 from astropy.io import fits
 import os
 from astropy.cosmology import FlatLambdaCDM
-from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area
+from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area, read_qpb_spectrum
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps
 from .spectral import gen_spec_box, save_spectrum
@@ -226,12 +226,17 @@ class XMMSimulator(object):
                   bkgmap=qpb_map,
                   write_arf=write_arf)
 
-    def ExtractFWC(self):
+    def ExtractFWC(self, calculate=False):
         """
         Determine the spectral shape of the FWC spectrum
         """
+        if calculate:
+            self.fwc_spec = gen_qpb_spectrum(self)
 
-        self.fwc_spec = gen_qpb_spectrum(self)
+        else:
+            area_tot = tot_area(self)
+
+            self.fwc_spec = read_qpb_spectrum(self) * area_tot
 
 
     def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):

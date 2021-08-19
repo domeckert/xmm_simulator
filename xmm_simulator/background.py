@@ -72,6 +72,24 @@ def gen_qpb_spectrum(xmmsim):
 
     return spec_rate_smoothed
 
+def read_qpb_spectrum(xmmsim):
+    """
+    Read pre-computed FWC spectra from the accompanying data
+
+    :param xmmsim:
+    :return fwc_spec:
+    """
+
+    qpb_file = get_data_file_path('fwc/%s_FWC.fits.gz' % (xmmsim.instrument))
+
+    fqpb = fits.open(qpb_file)
+
+    fwc_spec = fqpb[1].data['RATE']
+
+    fqpb.close()
+
+    return fwc_spec
+
 
 def gen_qpb_image(xmmsim, tsim, elow=0.5, ehigh=2.0):
     """

@@ -1,2 +1,3 @@
 include xmm_simulator/rmfs/*
 include xmm_simulator/imgs/*
+include xmm_simulator/fwc/*
