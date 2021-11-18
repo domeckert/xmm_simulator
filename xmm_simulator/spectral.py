@@ -35,7 +35,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     # Set region definition
     y, x = np.indices(box[:, :, 0].shape)
 
-    wcs = set_wcs(xmmsim=xmmsim)
+    wcs = set_wcs(xmmsim=xmmsim, type='box')
 
     wc = np.array([[cra, cdec]])
 
@@ -103,6 +103,86 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
     backscal_annulus = box_sel.shape[0] * (pixsize * 60.) ** 2 / (0.05 ** 2)
 
     return spec_conv, arf_mean_interp, backscal_annulus
+
+
+
+def gen_spec_evt(xmmsim, X_evt, Y_evt, chan_evt, cra, cdec, rin, rout, regfile=None):
+    """
+    Generate a predicted spectrum from a box within an annulus
+
+    :param xmmsim:
+    :param tsim:
+    :param cra:
+    :param cdec:
+    :param rin:
+    :param rout:
+    :param region:
+    :return:
+        - Spectrum
+        - ARF
+        - Backscale
+    """
+
+    # Get mask file
+    mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
+
+    inmask = fits.open(mask_file)
+
+    mask = inmask[1].data
+
+    pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
+
+    npix_out = mask.shape[0]
+
+    inmask.close()
+
+    # Set region definition
+    y, x = np.indices(mask.shape)
+
+    wcs = set_wcs(xmmsim=xmmsim)
+
+    wc = np.array([[cra, cdec]])
+
+    pixcrd = wcs.wcs_world2pix(wc, 1)
+
+    xsrc = pixcrd[0][0] - 1.
+
+    ysrc = pixcrd[0][1] - 1.
+
+    thetas = np.hypot(X_evt - xsrc, Y_evt - ysrc) * pixsize  # arcmin
+
+    thetas_ima = np.hypot(x - xsrc, y - ysrc) * pixsize
+
+    if regfile is not None:
+
+        thetas = region(regfile=regfile,
+                        thetas=thetas,
+                        wcs_inp=wcs,
+                        pixsize=pixsize)
+
+        thetas_ima = region(regfile=regfile,
+                        thetas=thetas_ima,
+                        wcs_inp=wcs,
+                        pixsize=pixsize)
+
+    test_annulus = np.where(np.logical_and(thetas >= rin, thetas < rout))
+
+    # Get photons per channel
+    sel_phot = chan_evt[test_annulus]
+
+    # Read RMF
+    rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
+
+    rmf = OGIPResponse(rsp_file=rmf_file)
+
+    (spec_sel, bins_spec) = np.histogram(sel_phot, bins=rmf.monte_carlo_energies)
+
+    # Compute BACKSCAL
+    sel_area = np.where(np.logical_and(thetas_ima >= rin, thetas_ima < rout))
+
+    backscal_annulus = len(sel_area[0]) * (pixsize * 60.) ** 2 / (0.05 ** 2)
+
+    return spec_sel, backscal_annulus
 
 
 def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):

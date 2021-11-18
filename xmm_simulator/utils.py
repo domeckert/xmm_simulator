@@ -4,6 +4,7 @@ from scipy.interpolate import interp1d, interp2d
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
+from threeML.utils.OGIP.response import OGIPResponse
 
 def calc_arf(theta, ebound_lo, ebound_hi, xmmsim):
     """
@@ -205,7 +206,7 @@ def get_ccf_file_names(xmmsim):
 
                     xmmsim.psf_file = tf
 
-def set_wcs(xmmsim):
+def set_wcs(xmmsim, type='mask'):
     """
     Get the fake (but consistent) WCS information for the box image
 
@@ -231,20 +232,26 @@ def set_wcs(xmmsim):
 
     npix_box = ima.shape[0]
 
-    header = hdu.header
+    if type == 'box':
+        header = hdu.header
 
-    pixsize_ori = 0.5 / xmmsim.box.shape[1] # degree
+        pixsize_ori = 0.5 / xmmsim.box.shape[1] # degree
 
-    header['CDELT1'] = - pixsize_ori
-    header['CDELT2'] = pixsize_ori
-    header['CTYPE1'] = head_mask['CTYPE1']
-    header['CTYPE2'] = head_mask['CTYPE2']
-    header['CRPIX1'] = head_mask['CRPIX1'] * npix_box / npix_mask
-    header['CRPIX2'] = head_mask['CRPIX2'] * npix_box / npix_mask
-    header['CRVAL1'] = 0.
-    header['CRVAL2'] = 0.
+        header['CDELT1'] = - pixsize_ori
+        header['CDELT2'] = pixsize_ori
+        header['CRPIX1'] = head_mask['CRPIX1'] * npix_box / npix_mask
+        header['CRPIX2'] = head_mask['CRPIX2'] * npix_box / npix_mask
 
-    wcs = WCS(header)
+        header['CTYPE1'] = head_mask['CTYPE1']
+        header['CTYPE2'] = head_mask['CTYPE2']
+        header['CRVAL1'] = 0.
+        header['CRVAL2'] = 0.
+
+        wcs = WCS(header)
+
+    else:
+
+        wcs = WCS(head_mask)
 
     return wcs
 
@@ -365,3 +372,104 @@ def region(regfile, thetas, wcs_inp, pixsize):
 
     return masked_thetas
 
+def arf_region(xmmsim, cra, cdec, rin, rout, regfile=None):
+    '''
+    Computing the emission-weighted ARF of a given region (annulus or circle) defined by the input parameters
+
+    :param xmmsim:
+    :param cra:
+    :param cdec:
+    :param rin:
+    :param rout:
+    :param regfile:
+    :return:
+    '''
+
+    if xmmsim.all_arfs is None:
+        print('ARF cube not found, please compute ARFs first')
+
+        return
+
+    box = xmmsim.box
+
+    pixsize = 30. / box.shape[0]  # arcmin
+
+    # Get mask file
+    mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
+
+    inmask = fits.open(mask_file)
+
+    mask = inmask[1].data
+
+    pixsize_mask = inmask[1].header['CDELT2'] * 60.  # arcmin
+
+    inmask.close()
+
+    # Set region definition
+    y, x = np.indices(box[:, :, 0].shape)
+
+    wcs = set_wcs(xmmsim=xmmsim, type='box')
+
+    wc = np.array([[cra, cdec]])
+
+    pixcrd = wcs.wcs_world2pix(wc, 1)
+
+    xsrc = pixcrd[0][0] - 1.
+
+    ysrc = pixcrd[0][1] - 1.
+
+    thetas = np.hypot(x - xsrc, y - ysrc) * pixsize  # arcmin
+
+    # Recast mask shape into box shape
+    x0 = (pixsize_mask * mask.shape[1] - 30.) / 2. / pixsize_mask
+
+    y0 = (pixsize_mask * mask.shape[0] - 30.) / 2. / pixsize_mask
+
+    x_box = x0 + np.arange(0, xmmsim.box.shape[1], 1) * pixsize / pixsize_mask
+
+    y_box = y0 + np.arange(0, xmmsim.box.shape[0], 1) * pixsize / pixsize_mask
+
+    y_near = np.repeat(np.floor(y_box + 0.5).astype(int), xmmsim.box.shape[1]).reshape(xmmsim.box.shape[0],
+                                                                                       xmmsim.box.shape[1])
+
+    x_near = np.tile(np.floor(x_box + 0.5).astype(int), xmmsim.box.shape[0]).reshape(xmmsim.box.shape[0],
+                                                                                     xmmsim.box.shape[1])
+
+    ind_box = (y_near, x_near)
+
+    mask_box = mask[ind_box]
+
+    if regfile is not None:
+
+        thetas = region(regfile=regfile,
+                        thetas=thetas,
+                        wcs_inp=wcs,
+                        pixsize=pixsize)
+
+    test_annulus = np.where(np.logical_and(np.logical_and(thetas >= rin, thetas < rout), mask_box>0.))
+
+    arfs_sel = xmmsim.all_arfs[test_annulus]
+
+    box_sel = xmmsim.box[test_annulus]
+
+    # Read RMF
+    rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
+
+    rmf = OGIPResponse(rsp_file=rmf_file)
+
+    nchan = len(rmf.monte_carlo_energies) - 1
+
+    mc_ene = (rmf.monte_carlo_energies[:nchan] + rmf.monte_carlo_energies[1:]) / 2.
+
+    # Compute mean ARF and interpolate
+    arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
+
+    finterp_arf = interp1d(xmmsim.box_ene_mean, arf_mean, fill_value='extrapolate')
+
+    arf_mean_interp = finterp_arf(mc_ene)
+
+    neg_arf = np.where(arf_mean_interp < 0.)
+
+    arf_mean_interp[neg_arf] = 0.
+
+    return arf_mean_interp
