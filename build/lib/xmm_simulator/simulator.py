@@ -5,7 +5,7 @@ from astropy.cosmology import FlatLambdaCDM
 from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area, read_qpb_spectrum
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
-from .spectral import gen_spec_box, save_spectrum
+from .spectral import gen_spec_box, save_spectrum, gen_spec_evt
 from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt
 from scipy.interpolate import interp1d
 
@@ -314,65 +314,85 @@ class XMMSimulator(object):
         :type NH: float
         """
 
-        print('# Extracting spectrum...')
-        box_spec, arf, backscal = gen_spec_box(self,
-                                               tsim=tsim,
-                                               cra=cra,
-                                               cdec=cdec,
-                                               rin=rin,
-                                               rout=rout,
-                                               regfile=regfile)
+        if self.events:
+            print('# Event file found, we will extract the spectrum from the event file')
 
-        area_spec = backscal / 60.**2 * (0.05**2) # arcmin^2
+            print('# Extracting image from event file...')
+            spectrum, arf, backscal = gen_spec_evt(self,
+                                                   cra=cra,
+                                                   cdec=cdec,
+                                                   rin=rin,
+                                                   rout=rout,
+                                                   regfile=regfile)
 
-        area_tot = tot_area(self)
+        else:
+            print('# Extracting spectrum...')
+            box_spec, arf, backscal = gen_spec_box(self,
+                                                   tsim=tsim,
+                                                   cra=cra,
+                                                   cdec=cdec,
+                                                   rin=rin,
+                                                   rout=rout,
+                                                   regfile=regfile)
 
-        emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+            area_spec = backscal / 60. ** 2 * (0.05 ** 2)  # arcmin^2
 
-        bin_width = emax - emin
+            if withqpb:
 
-        if withqpb:
-            if self.fwc_spec is None:
-                print('Please extract the FWC spectrum first')
+                area_tot = tot_area(self)
+
+                emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+
+                bin_width = emax - emin
+
+                if self.fwc_spec is None:
+                    print('Please extract the FWC spectrum first')
+                    qpb_spec = box_spec * 0.
+
+                else:
+                    print('# Extracting FWC spectrum...')
+
+                    qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+
+            else:
                 qpb_spec = box_spec * 0.
 
+            if withskybkg:
+                print('# Generating sky background spectrum...')
+                skybkg_spec = gen_skybkg_spectrum(self,
+                                                  tsim=tsim,
+                                                  area_spec=area_spec,
+                                                  arf=arf,
+                                                  lhb=lhb,
+                                                  ght=ght,
+                                                  ghn=ghn,
+                                                  cxb=cxb,
+                                                  NH=NH)
             else:
-                print('# Extracting FWC spectrum...')
+                skybkg_spec = box_spec * 0.
 
-                qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+            spectrum = np.random.poisson(box_spec + skybkg_spec) + qpb_spec # Total spectrum
 
-            if tsim_qpb is not None:
-                print('# Extracting FWC spectrum with different exposure time...')
+        if withqpb:
 
-                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(
-                    int)
+            area_spec = backscal / 60. ** 2 * (0.05 ** 2)  # arcmin^2
 
-            else:
+            area_tot = tot_area(self)
+
+            emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+
+            bin_width = emax - emin
+
+            if tsim_qpb is None:
+
                 tsim_qpb = tsim
 
-                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+            print('# Extracting FWC spectrum realization...')
+
+            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(int)
 
         else:
-            qpb_spec = box_spec * 0.
-
-            qpb_spec_out = qpb_spec
-
-
-        if withskybkg:
-            print('# Generating sky background spectrum...')
-            skybkg_spec = gen_skybkg_spectrum(self,
-                                              tsim=tsim,
-                                              area_spec=area_spec,
-                                              arf=arf,
-                                              lhb=lhb,
-                                              ght=ght,
-                                              ghn=ghn,
-                                              cxb=cxb,
-                                              NH=NH)
-        else:
-            skybkg_spec = box_spec * 0.
-
-        spectrum = np.random.poisson(box_spec + skybkg_spec) + qpb_spec # Total spectrum
+            qpb_spec_out = None
 
         print('# Now saving spectra and region files...')
         save_spectrum(self,

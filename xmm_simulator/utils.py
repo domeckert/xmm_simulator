@@ -235,7 +235,7 @@ def set_wcs(xmmsim, type='mask'):
     if type == 'box':
         header = hdu.header
 
-        pixsize_ori = 0.5 / xmmsim.box.shape[1] # degree
+        pixsize_ori = xmmsim.box_size / 60. / xmmsim.box.shape[1] # degree
 
         header['CDELT1'] = - pixsize_ori
         header['CDELT2'] = pixsize_ori
@@ -374,6 +374,110 @@ def region(regfile, thetas, wcs_inp, pixsize):
 
     return masked_thetas
 
+
+def region_evt(xmmsim, regfile, thetas, wcs_inp, pixsize):
+    """
+    Mask regions selected in regfile
+
+    :param regfile: Region file in DS9 format
+    :param thetas:  Array containing the radii to the center in arcmin
+    :param wcs_inp: WCS coordinate transformation class
+    :param pixsize: Pixel size
+    :return: Modified radii with masked regions = -1
+    """
+    freg = open(regfile)
+    lreg = freg.readlines()
+    freg.close()
+    nsrc = 0
+    nreg = len(lreg)
+
+    masked_thetas = np.copy(thetas)
+
+    regtype = None
+
+    for i in range(nreg):
+        if 'fk5' in lreg[i]:
+            regtype = 'fk5'
+        elif 'image' in lreg[i]:
+            regtype = 'image'
+
+    if regtype is None:
+        print('Error: invalid format')
+        return
+    for i in range(nreg):
+        if 'circle' in lreg[i]:
+            vals = lreg[i].split('(')[1].split(')')[0]
+            if regtype == 'fk5':
+                xsrc = float(vals.split(',')[0])
+                ysrc = float(vals.split(',')[1])
+                rad = vals.split(',')[2]
+                if '"' in rad:
+                    rad = float(rad.split('"')[0]) / pixsize / 60.
+                elif '\'' in rad:
+                    rad = float(rad.split('\'')[0]) / pixsize
+                else:
+                    rad = float(rad) / pixsize * 60.
+                wc = np.array([[xsrc, ysrc]])
+                pixcrd = wcs_inp.wcs_world2pix(wc, 1)
+                xsrc = pixcrd[0][0] - 1.
+                ysrc = pixcrd[0][1] - 1.
+            else:
+                xsrc = float(vals.split(',')[0])
+                ysrc = float(vals.split(',')[1])
+                rad = float(vals.split(',')[2])
+
+            # mask events that are inside the area
+            rads = np.hypot(xsrc - xmmsim.X_evt, ysrc - xmmsim.Y_evt)
+
+            # Mask source
+            src = np.where(rads < rad)
+            masked_thetas[src] = -1.0
+
+            nsrc = nsrc + 1
+
+        elif 'ellipse' in lreg[i]:
+            vals = lreg[i].split('(')[1].split(')')[0]
+            if regtype == 'fk5':
+                xsrc = float(vals.split(',')[0])
+                ysrc = float(vals.split(',')[1])
+                rad1 = vals.split(',')[2]
+                rad2 = vals.split(',')[3]
+                angle = float(vals.split(',')[4])
+                if '"' in rad1:
+                    rad1 = float(rad1.split('"')[0]) / pixsize / 60.
+                    rad2 = float(rad2.split('"')[0]) / pixsize / 60.
+                elif '\'' in rad1:
+                    rad1 = float(rad1.split('\'')[0]) / pixsize
+                    rad2 = float(rad2.split('\'')[0]) / pixsize
+                else:
+                    rad1 = float(rad1) / pixsize * 60.
+                    rad2 = float(rad2) / pixsize * 60.
+                wc = np.array([[xsrc, ysrc]])
+                pixcrd = wcs_inp.wcs_world2pix(wc, 1)
+                xsrc = pixcrd[0][0] - 1.
+                ysrc = pixcrd[0][1] - 1.
+            else:
+                xsrc = float(vals.split(',')[0])
+                ysrc = float(vals.split(',')[1])
+                rad1 = float(vals.split(',')[2])
+                rad2 = float(vals.split(',')[3])
+                angle = float(vals.split(',')[2])
+            ellang = angle * np.pi / 180. + np.pi / 2.
+            aoverb = rad1 / rad2
+            xtil = np.cos(ellang) * (xmmsim.X_evt - xsrc) + np.sin(ellang) * (xmmsim.Y_evt - ysrc)
+            ytil = -np.sin(ellang) * (xmmsim.X_evt - xsrc) + np.cos(ellang) * (xmmsim.Y_evt - ysrc)
+            rads = aoverb * np.hypot(xtil, ytil / aoverb)
+
+            # Mask source
+            src = np.where(rads < rad)
+            masked_thetas[src] = -1.0
+            nsrc = nsrc + 1
+
+    print('Excluded %d sources' % (nsrc))
+
+    return masked_thetas
+
+
 def arf_region(xmmsim, cra, cdec, rin, rout, regfile=None):
     '''
     Computing the emission-weighted ARF of a given region (annulus or circle) defined by the input parameters
@@ -394,7 +498,7 @@ def arf_region(xmmsim, cra, cdec, rin, rout, regfile=None):
 
     box = xmmsim.box
 
-    pixsize = 30. / box.shape[0]  # arcmin
+    pixsize = xmmsim.box_size / box.shape[0]  # arcmin
 
     # Get mask file
     mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
@@ -423,9 +527,9 @@ def arf_region(xmmsim, cra, cdec, rin, rout, regfile=None):
     thetas = np.hypot(x - xsrc, y - ysrc) * pixsize  # arcmin
 
     # Recast mask shape into box shape
-    x0 = (pixsize_mask * mask.shape[1] - 30.) / 2. / pixsize_mask
+    x0 = (pixsize_mask * mask.shape[1] - xmmsim.box_size) / 2. / pixsize_mask
 
-    y0 = (pixsize_mask * mask.shape[0] - 30.) / 2. / pixsize_mask
+    y0 = (pixsize_mask * mask.shape[0] - xmmsim.box_size) / 2. / pixsize_mask
 
     x_box = x0 + np.arange(0, xmmsim.box.shape[1], 1) * pixsize / pixsize_mask
 

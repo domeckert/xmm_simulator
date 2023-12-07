@@ -1,6 +1,6 @@
 import numpy as np
 from astropy.io import fits
-from .utils import region, set_wcs, get_data_file_path
+from .utils import region, set_wcs, get_data_file_path, region_evt
 from threeML.utils.OGIP.response import OGIPResponse
 from scipy.interpolate import interp1d
 from datetime import datetime
@@ -168,15 +168,16 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
     thetas_ima = np.hypot(x - xsrc_box, y - ysrc_box) * pixsize_ori
 
     if regfile is not None:
-        thetas = region(regfile=regfile,
-                                      thetas=thetas,
-                                      wcs_inp=wcs_mask,
-                                      pixsize=pixsize)
+        thetas = region_evt(xmmsim=xmmsim,
+                            regfile=regfile,
+                            thetas=thetas,
+                            wcs_inp=wcs_mask,
+                            pixsize=pixsize)
 
         thetas_ima = region(regfile=regfile,
-                                          thetas=thetas_ima,
-                                          wcs_inp=wcs_box,
-                                          pixsize=pixsize_ori)
+                            thetas=thetas_ima,
+                            wcs_inp=wcs_box,
+                            pixsize=pixsize_ori)
 
     test_annulus = np.where(np.logical_and(thetas >= rin, thetas < rout))
 
@@ -225,6 +226,7 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
     :param arf:
     :param qpb:
     :param backscal:
+    :param tsim_qpb:
     :return:
     """
 
@@ -305,56 +307,58 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
 
     hdul.close()
 
-    # Write QPB
-    hdul = fits.HDUList([fits.PrimaryHDU()])
-    cols = []
-    cols.append(fits.Column(name='CHANNEL', format='J', array=channel))
-    cols.append(fits.Column(name='COUNTS', format='J', unit='count', array=qpb))
-    cols = fits.ColDefs(cols)
-    tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECTRUM')
-    hdr['ANCRFILE'] = 'none'
-    hdr['BACKFILE'] = 'none'
-    hdr['EXPOSURE'] = tsim_qpb
-    hdr['ONTIME'] = tsim_qpb
-    tbhdu.header = hdr
-    hdul.append(tbhdu)
+    if qpb is not None:
+        # Write QPB
+        hdul = fits.HDUList([fits.PrimaryHDU()])
+        cols = []
+        cols.append(fits.Column(name='CHANNEL', format='J', array=channel))
+        cols.append(fits.Column(name='COUNTS', format='J', unit='count', array=qpb))
+        cols = fits.ColDefs(cols)
+        tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECTRUM')
+        hdr['ANCRFILE'] = 'none'
+        hdr['BACKFILE'] = 'none'
+        hdr['EXPOSURE'] = tsim_qpb
+        hdr['ONTIME'] = tsim_qpb
+        tbhdu.header = hdr
+        hdul.append(tbhdu)
 
-    hdul.writeto(bkg_name, overwrite=True)
-    print('Background spectrum written to', bkg_name)
+        hdul.writeto(bkg_name, overwrite=True)
+        print('Background spectrum written to', bkg_name)
 
-    hdul.close()
+        hdul.close()
 
-    # Write ARF
+    if arf is not None:
+        # Write ARF
 
-    mc_ene_lo = rmf.monte_carlo_energies[:nchan]
-    mc_ene_hi = rmf.monte_carlo_energies[1:]
+        mc_ene_lo = rmf.monte_carlo_energies[:nchan]
+        mc_ene_hi = rmf.monte_carlo_energies[1:]
 
-    hdul = fits.HDUList([fits.PrimaryHDU()])
-    cols = []
-    cols.append(fits.Column(name='ENERG_LO', format='J', unit='keV', array=mc_ene_lo))
-    cols.append(fits.Column(name='ENERG_HI', format='J', unit='keV', array=mc_ene_hi))
-    cols.append(fits.Column(name='SPECRESP', format='J', unit='cm2', array=arf))
-    cols = fits.ColDefs(cols)
-    tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECRESP')
-    hdr = tbhdu.header
-    hdr['ARFVERSN'] = '1992a'
-    hdr['HDUCLASS'] = 'OGIP'
-    hdr['HDUCLAS1'] = 'RESPONSE'
-    hdr['HDUCLAS2'] = 'SPECRESP'
-    hdr['HDUVERS1'] = '1.3.0'
-    hdr['ORIGIN'] = 'UNIGE'
-    hdr['CREATOR'] = 'xmm_simulator'
-    hdr['TELESCOP'] = 'XMM'
-    hdr['INSTRUME'] = 'EPN'
-    hdr['OBS_MODE'] = 'FullFrame'
-    hdr['FILTER'] = 'Medium'
-    hdr['DATE'] = today.isoformat()
-    hdul.append(tbhdu)
+        hdul = fits.HDUList([fits.PrimaryHDU()])
+        cols = []
+        cols.append(fits.Column(name='ENERG_LO', format='J', unit='keV', array=mc_ene_lo))
+        cols.append(fits.Column(name='ENERG_HI', format='J', unit='keV', array=mc_ene_hi))
+        cols.append(fits.Column(name='SPECRESP', format='J', unit='cm2', array=arf))
+        cols = fits.ColDefs(cols)
+        tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECRESP')
+        hdr = tbhdu.header
+        hdr['ARFVERSN'] = '1992a'
+        hdr['HDUCLASS'] = 'OGIP'
+        hdr['HDUCLAS1'] = 'RESPONSE'
+        hdr['HDUCLAS2'] = 'SPECRESP'
+        hdr['HDUVERS1'] = '1.3.0'
+        hdr['ORIGIN'] = 'UNIGE'
+        hdr['CREATOR'] = 'xmm_simulator'
+        hdr['TELESCOP'] = 'XMM'
+        hdr['INSTRUME'] = 'EPN'
+        hdr['OBS_MODE'] = 'FullFrame'
+        hdr['FILTER'] = 'Medium'
+        hdr['DATE'] = today.isoformat()
+        hdul.append(tbhdu)
 
-    hdul.writeto(arf_name, overwrite=True)
-    print('ARF written to file', arf_name)
+        hdul.writeto(arf_name, overwrite=True)
+        print('ARF written to file', arf_name)
 
-    hdul.close()
+        hdul.close()
 
 
 
