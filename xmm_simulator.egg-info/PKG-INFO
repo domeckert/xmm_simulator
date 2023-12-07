@@ -1,10 +1,12 @@
-Metadata-Version: 1.0
+Metadata-Version: 2.1
 Name: xmm-simulator
 Version: 0.1.0
 Summary: XMM photon simulator from boxes extracted from hydro sims
-Home-page: UNKNOWN
 Author: Dominique Eckert
 Author-email: Dominique.Eckert@unige.ch
-License: UNKNOWN
-Description: UNKNOWN
-Platform: UNKNOWN
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: astropy
+Requires-Dist: matplotlib
+Requires-Dist: pyatomdb
+Requires-Dist: threeML

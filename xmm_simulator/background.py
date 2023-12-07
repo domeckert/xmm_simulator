@@ -167,8 +167,8 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     modgh = APEC()
     modcxb = Powerlaw()
 
-    modlhb.init_session()
-    modgh.init_session()
+    #modlhb.init_session()
+    #modgh.init_session()
 
     modlhb.kT = 0.11
     modlhb.K = lhb
@@ -179,7 +179,7 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     modcxb.index = -1.46
     modcxb.K = cxb
     modphabs = PhAbs()
-    modphabs.init_xsect()
+    #modphabs.init_xsect()
 
     modphabs.NH = NH
 
@@ -264,8 +264,8 @@ def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=N
     modgh = APEC()
     modcxb = Powerlaw()
 
-    modlhb.init_session()
-    modgh.init_session()
+    #modlhb.init_session()
+    #modgh.init_session()
 
     modlhb.kT = 0.11
     modlhb.K = lhb
@@ -276,7 +276,7 @@ def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=N
     modcxb.index = -1.46
     modcxb.K = cxb
     modphabs = PhAbs()
-    modphabs.init_xsect()
+    #modphabs.init_xsect()
 
     modphabs.NH = NH
 

@@ -47,6 +47,66 @@ def psf_convole(image, pixsize, xmmsim):
 
     return blurred
 
+def exposure_map(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
+    """
+    Generate an effective exposure map including vignetting curve in an input energy band
+
+    :param xmmsim: XMMSimulator
+    :param tsim: Simulation exposure time in sec
+    :param elow: Lower energy boundary of the image (defaults to 0.5)
+    :param ehigh: Upper energy boundary of the image (defaults to 2.0)
+    :param nbin: Number of energy bins to subdivide the band for vignetting curve calculation
+    :return: effective exposure map
+    """
+    # Get mask file
+    mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
+
+    inmask = fits.open(mask_file)
+
+    mask = inmask[1].data
+
+    pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
+
+    inmask.close()
+
+    # Reading vignetting curve
+    dtheta = xmmsim.dtheta
+
+    rads = np.arange(0., 16., dtheta)
+
+    ene_vig = xmmsim.vignetting['ENERGY'] / 1e3
+    vig_fact = xmmsim.vignetting['VIGNETTING_FACTOR']
+
+    ene_bins = np.linspace(elow, ehigh, nbin+1)
+
+    ene_bin_width = ene_bins[1] - ene_bins[0]
+
+    expmap, bkg_map = np.zeros(mask.shape), np.zeros(mask.shape)
+
+    cx, cy = mask.shape[0] / 2., mask.shape[1] / 2.
+
+    y, x = np.indices(mask.shape)
+
+    thetas = np.hypot(x - cx, y - cy) * pixsize  # arcmin
+
+    for i in range(nbin):
+
+        ene_bin = (ene_bins[i] + ene_bins[i+1]) / 2.
+
+        nearest = np.argsort(np.abs(ene_vig - ene_bin))[0]
+
+        vig_curve = vig_fact[nearest]
+
+        texp = np.interp(thetas, rads, vig_curve) * tsim
+
+        expmap = expmap + texp
+
+    expmap = expmap / nbin
+
+    expmap = expmap * mask
+
+    return expmap
+
 
 def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
     """
@@ -78,7 +138,7 @@ def gen_image_box(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
     xori = np.arange(0, xmmsim.box.shape[1], 1)
     yori = np.arange(0, xmmsim.box.shape[0], 1)
 
-    pixsize_ori = 30. / xmmsim.box.shape[1] # arcmin
+    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[1] # arcmin
 
     newima = np.zeros(mask.shape)
 

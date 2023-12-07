@@ -1,216 +1,65 @@
 import numpy as np
 from astropy.io import fits
-from scipy.interpolate import interp1d, interp2d
 import os
 from astropy.cosmology import FlatLambdaCDM
-import progressbar
-import pkg_resources
-
-cosmo_elena = FlatLambdaCDM(Om0=0.307114989, H0=67.77)
-
-def calc_arf(theta, ebound_lo, ebound_hi, xmmsim):
-    """
-    Function to compute the ARF at a given off-axis angle theta
-
-    :param theta: Off-axis angle in arcmin
-    :type theta: float
-    :param ebound_lo: Array containing the lower boundaries of the energy bins
-    :type ebound_lo: numpy.ndarray
-    :param ebound_hi: Array containing the upper boundaries of the energy bins
-    :type ebound_hi: numpy.ndarray
-    :param onaxis: On-axis response
-    :param vignetting: Vignetting curve and energy dependence
-    :param dtheta: Size of vignetting bins in arcmin
-    :param corrarea: Effective area correction factor
-    :param ene_qeff: Quantum efficiency energy definition
-    :param qeff: Quantum efficiency curve
-    :param ene_filter: Filter energy definition
-    :param filter_transf: Filter transmission curve
-    :return: ARF
-    :rtype: numpy.ndarray
-    """
-    dtheta = xmmsim.dtheta
-
-    rads = np.arange(0., 16., dtheta)
-
-    ene_vig = xmmsim.vignetting['ENERGY'] / 1e3
-    vig_fact = xmmsim.vignetting['VIGNETTING_FACTOR']
-
-    ene_onaxis = xmmsim.onaxis['ENERGY'] / 1e3
-    area_onaxis = xmmsim.onaxis['AREA']
-
-    ene_corr = xmmsim.corrarea['ENERGY'] / 1e3
-    corr_fact = xmmsim.corrarea['FACTOR']
-
-    fvig_interp = interp2d(rads, ene_vig, vig_fact, kind='cubic')
-
-    vig_theta = fvig_interp(theta, ene_vig).flatten()
-
-    ebound = (ebound_lo + ebound_hi) / 2.
-
-    farea_interp = interp1d(ene_onaxis, area_onaxis, kind='linear')
-
-    area_ebound = farea_interp(ebound)
-
-    fvig_ebound = interp1d(ene_vig, vig_theta, kind='cubic')
-
-    vig_ebound = fvig_ebound(ebound)
-
-    fcorr_interp = interp1d(ene_corr, corr_fact, kind='cubic')
-
-    corr_ebound = fcorr_interp(ebound)
-
-    fqeff = interp1d(xmmsim.ene_qeff.flatten(), xmmsim.qeff.flatten(), kind='cubic', fill_value="extrapolate")
-
-    qeff_ebound = fqeff(ebound)
-
-    filter_interp = interp1d(xmmsim.ene_filter.flatten(), xmmsim.filter.flatten(), kind='cubic', fill_value="extrapolate")
-
-    filter_ebound = filter_interp(ebound)
-
-    arf = area_ebound * vig_ebound * corr_ebound * filter_ebound * qeff_ebound
-
-    return arf
-
-
-def get_ccf_file_names(xmmsim):
-    """
-    Function that searches through the CCF directory and selects the latest calibration files
-
-    :param xmmsim: XMM Simulator
-    :type xmmsim: class:`xmm_simulator.XMMSimulator`
-    """
-
-    ccfpath = xmmsim.ccfpath
-
-    instrument = xmmsim.instrument
-
-    all_ccf = os.listdir(ccfpath)
-
-    nqe, narea, nfilter, nfwc, npsf = 0, 0, 0, 0, 0
-
-    for tf in all_ccf:
-
-        if 'E' + instrument + '_QUANTUMEF' in tf:
-
-            tn = int(tf.split('_')[2].split('.')[0])
-
-            if tn > nqe:
-                nqe = tn
-
-                xmmsim.qe_file = tf
-
-        if 'E' + instrument + '_FILTERTRANSX' in tf:
-
-            tn = int(tf.split('_')[2].split('.')[0])
-
-            if tn > nfilter:
-                nfilter = tn
-
-                xmmsim.filter_file = tf
-
-        if 'E' + instrument + '_FWC' in tf:
-
-            tn = int(tf.split('_')[2].split('.')[0])
-
-            if tn > nfwc:
-                nfwc = tn
-
-                xmmsim.fwc_file = tf
-
-        if instrument == 'PN':
-
-            if 'XRT3_XAREAEF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > narea:
-                    narea = tn
-
-                    xmmsim.area_file = tf
-
-            if 'XRT3_XPSF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > npsf:
-                    npsf = tn
-
-                    xmmsim.psf_file = tf
-
-        if instrument == 'MOS1':
-
-            if 'XRT1_XAREAEF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > narea:
-                    narea = tn
-
-                    xmmsim.area_file = tf
-
-            if 'XRT1_XPSF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > npsf:
-                    npsf = tn
-
-                    xmmsim.psf_file = tf
-
-        if instrument == 'MOS2':
-
-            if 'XRT1_XAREAEF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > narea:
-                    narea = tn
-
-                    xmmsim.area_file = tf
-
-            if 'XRT2_XPSF' in tf:
-
-                tn = int(tf.split('_')[2].split('.')[0])
-
-                if tn > npsf:
-                    npsf = tn
-
-                    xmmsim.psf_file = tf
-
+from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area, read_qpb_spectrum
+from .utils import get_ccf_file_names, calc_arf, get_data_file_path
+from .imaging import gen_image_box, save_maps, exposure_map
+from .spectral import gen_spec_box, save_spectrum
+from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt
+from scipy.interpolate import interp1d
 
 class XMMSimulator(object):
     """
 
     """
-    def __init__(self, boxfile, ccfpath, instrument):
+    def __init__(self, boxfile, ccfpath, instrument,
+                 box_size=0.5, box_ene=None):
         """
         Constructor of class XMMSimulator
 
         :param boxfile: Input photon box file
+        :type boxfile: str
         :param ccfpath: Path to calibration file directory
+        :type ccfpath: str
         :param instrument: Instrument to be simulated (PN, MOS1, or MOS2)
+        :type instrument: str
+        :param box_size: Size of the provided simulation box in degrees (defaults to 0.5)
+        :type box_size: float
+        :param box_ene: Numpy array containing the energy definition of the box. If None, defaults to a linear grid between 0.1 and 10 keV with a step of 0.02
+        :type box_ene: numpy.ndarray
         """
+
+        try:
+            if instrument not in ['PN', 'MOS1', 'MOS2']:
+                raise ValueError
+
+        except ValueError:
+            print('ERROR: instrument should be one of PN, MOS1, or MOS2')
+            return
 
         fb = fits.open(boxfile)
 
         self.box = fb[0].data
 
+        self.box_size = box_size * 60. # arcmin
+
         fb.close()
 
-        self.box_ene = np.arange(0.1, 10.02, 0.02)
+        if box_ene is None:
+            self.box_ene = np.arange(0.1, 10.01, 0.02)
 
-        self.box_ene_mean = np.arange(0.11, 10., 0.02)
+            self.box_ene_mean = np.arange(0.11, 10., 0.02)
 
-        self.box_ene_width = 0.02
+            self.box_ene_width = 0.02
+        else:
+            self.box_ene = box_ene
+
+            self.box_ene_mean = (box_ene[1:] + box_ene[:-1]) / 2.
+
+            self.box_ene_width = box_ene[1:] - box_ene[:-1]
 
         self.ccfpath = ccfpath
-
-        try:
-            instrument == 'PN' or instrument=='MOS1' or instrument=='MOS2'
-
-        except TypeError:
-            print('ERROR: instrument should be one of PN, MOS1, or MOS2')
 
         self.instrument = instrument
 
@@ -225,6 +74,7 @@ class XMMSimulator(object):
 
         self.nrad = len(self.vignetting[0][1])
         self.rads_vignetting = np.arange(0., 16., self.dtheta)
+        ccf_arf_pn.close()
 
         fqeff = fits.open(ccfpath + self.qe_file)
 
@@ -242,6 +92,30 @@ class XMMSimulator(object):
 
         filter_transf.close()
 
+        areacorr_file = get_data_file_path('rmfs/mos_areacorr.fits')
+
+        fareacorr = fits.open(areacorr_file)
+
+        areacorr_data = fareacorr['AREACORR'].data
+
+        self.ene_areacorr = areacorr_data['ENERGY']
+
+        self.areacorr = areacorr_data['AREACORR']
+
+        fareacorr.close()
+
+        rmf_file = get_data_file_path('rmfs/%s.rmf' % (instrument))
+
+        frmf = fits.open(rmf_file)
+        ebounds = frmf['EBOUNDS'].data
+        frmf.close()
+        self.ebounds = ebounds
+
+        self.cx = None
+        self.cy = None
+        self.all_arfs = None
+        self.fwc_spec = None
+        self.events = False
 
     def ARF_Box(self):
         """
@@ -249,7 +123,7 @@ class XMMSimulator(object):
 
         """
 
-        pixsize = 30. / self.box.shape[0]  # box size is 30 arcmin
+        pixsize = self.box_size / self.box.shape[0]  # by default box size is 30 arcmin
 
         y, x = np.indices(self.box[:, :, 0].shape)
 
@@ -258,36 +132,334 @@ class XMMSimulator(object):
         self.cx = cx
         self.cy = cy
 
-        thetas = np.hypot(x - cx, y - cy) * pixsize  # arcmin
+        nthetas = 200
+
+        thetas = np.linspace(0., 22., nthetas)
+
+        theta_image = np.hypot(x - cx, y - cy) * pixsize  # arcmin
 
         nene_ori = self.box.shape[2]
 
         ene_lo, ene_hi = self.box_ene[:nene_ori], self.box_ene[1:]
 
-        all_arfs = np.empty((self.box.shape[0], self.box.shape[1], nene_ori))
+        res = np.empty((nthetas, nene_ori))
 
-        for i in progressbar.progressbar(range(self.box.shape[0])):
+        for i in range(nthetas):
+            if thetas[i]<=15.:
+                res[i, :] = calc_arf(theta=thetas[i],
+                                     ebound_lo=ene_lo,
+                                     ebound_hi=ene_hi,
+                                     xmmsim=self)
+            else:
+                res[i, :] = 0.
 
-            for j in range(self.box.shape[1]):
+        finterp = interp1d(thetas, res, axis=0)
 
-                if thetas[j, i] <= np.max(self.rads_vignetting):
+        all_arfs = finterp(theta_image)
 
-                    all_arfs[j, i, :] = calc_arf(thetas[j, i], ene_lo, ene_hi, self)
-
+        # all_arfs = np.empty((self.box.shape[0], self.box.shape[1], nene_ori))
+        #
+        # for i in progressbar.progressbar(range(self.box.shape[0])):
+        #
+        #     for j in range(self.box.shape[1]):
+        #
+        #         if thetas[j, i] <= np.max(self.rads_vignetting):
+        #
+        #             all_arfs[j, i, :] = calc_arf(thetas[j, i], ene_lo, ene_hi, self)
 
         self.all_arfs = all_arfs
 
-    def ExtractImage(self, outfile, elow=0.5, ehigh=2.0,):
+    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None, write_arf=False):
         """
         Extract an image in the energy band (elow, ehigh). The image is Poissonized, convolved with PSF, and background is added.
 
-        :param outfile: Name of output FTTS file
-        :type outfile: str
-        :param elow: Lower energy boundary of the image
+        :param tsim: Exposure time of simulation
+        :type tsim: float
+        :param outname: Name used for output FTTS files
+        :type outname: str
+        :param elow: Lower energy boundary of the image (defaults to 0.5)
         :type elow: float
-        :param ehigh: Upper energy boundary of the image
+        :param ehigh: Upper energy boundary of the image (defaults to 2.0)
         :type ehigh: float
+        :param nbin: Number of energy bins into which the calculation will be split for exposure map/vignetting calculation (defaults to 10)
+        :type nbin: int
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
         """
+
+        if self.events:
+            print('# Event file found, we will extract the image from the event file')
+
+            print('# Extracting image from event file...')
+            poisson_map = gen_image_evt(self,
+                                        X_evt=self.X_evt,
+                                        Y_evt=self.Y_evt,
+                                        chan_evt=self.chan_evt,
+                                        tsim=tsim,
+                                        elow=elow,
+                                        ehigh=ehigh,
+                                        outfile=None)
+
+            print('# Generating exposure map...')
+            expmap = exposure_map(self,
+                                  tsim=tsim,
+                                  elow=elow,
+                                  ehigh=ehigh,
+                                  nbin=nbin)
+
+        else:
+            print('# No event file found, we will extract the map directly from the image box')
+
+            print('# Generating sky background and exposure maps...')
+            skybkg_map, expmap = gen_skybkg_image(self,
+                                                  tsim=tsim,
+                                                  elow=elow,
+                                                  ehigh=ehigh,
+                                                  nbin=nbin,
+                                                  lhb=lhb,
+                                                  ght=ght,
+                                                  ghn=ghn,
+                                                  cxb=cxb,
+                                                  NH=NH)
+
+            if not withskybkg:
+                skybkg_map = skybkg_map * 0.
+
+            else:
+                qpb_map = skybkg_map * 0.
+
+            print('# Generating box image...')
+            box_map = gen_image_box(self,
+                                    tsim=tsim,
+                                    elow=elow,
+                                    ehigh=ehigh,
+                                    nbin=nbin)
+
+            print("# Simulating data...")
+            poisson_map = np.random.poisson(box_map + qpb_map + skybkg_map)
+
+        if withqpb:
+            print('# Generating QPB map...')
+            qpb_map = gen_qpb_image(self,
+                                    tsim=tsim,
+                                    elow=elow,
+                                    ehigh=ehigh)
+        else:
+            qpb_map = poisson_map * 0.
+
+        print('# Saving data into output files...')
+        save_maps(self,
+                  outname=outname,
+                  countmap=poisson_map,
+                  expmap=expmap,
+                  bkgmap=qpb_map,
+                  write_arf=write_arf)
+
+    def ExtractFWC(self, calculate=False):
+        """
+        Determine the spectral shape of the FWC spectrum
+        """
+        if calculate:
+            self.fwc_spec = gen_qpb_spectrum(self)
+
+        else:
+            area_tot = tot_area(self)
+
+            self.fwc_spec = read_qpb_spectrum(self) * area_tot
+
+
+    def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+        """
+        Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
+
+        :param tsim: Exposure time of simulation
+        :type tsim: float
+        :param outdir: Name of output directory
+        :type outdir: str
+        :param cra: Right ascension of the center of the annulus
+        :type cra: float
+        :param cdec: Declination of the center of the annulus
+        :type cdec: float
+        :param rin: Inner radius of the region in arcmin
+        :type rin: float
+        :param rout: Outer radius of the region in arcmin
+        :type rout: float
+        :param regfile: DS9 region file containing the definition of regions to be excluded
+        :type regfile: str
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
+        """
+
+        print('# Extracting spectrum...')
+        box_spec, arf, backscal = gen_spec_box(self,
+                                               tsim=tsim,
+                                               cra=cra,
+                                               cdec=cdec,
+                                               rin=rin,
+                                               rout=rout,
+                                               regfile=regfile)
+
+        area_spec = backscal / 60.**2 * (0.05**2) # arcmin^2
+
+        area_tot = tot_area(self)
+
+        emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+
+        bin_width = emax - emin
+
+        if withqpb:
+            if self.fwc_spec is None:
+                print('Please extract the FWC spectrum first')
+                qpb_spec = box_spec * 0.
+
+            else:
+                print('# Extracting FWC spectrum...')
+
+                qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+
+            if tsim_qpb is not None:
+                print('# Extracting FWC spectrum with different exposure time...')
+
+                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(
+                    int)
+
+            else:
+                tsim_qpb = tsim
+
+                qpb_spec_out = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+
+        else:
+            qpb_spec = box_spec * 0.
+
+            qpb_spec_out = qpb_spec
+
+
+        if withskybkg:
+            print('# Generating sky background spectrum...')
+            skybkg_spec = gen_skybkg_spectrum(self,
+                                              tsim=tsim,
+                                              area_spec=area_spec,
+                                              arf=arf,
+                                              lhb=lhb,
+                                              ght=ght,
+                                              ghn=ghn,
+                                              cxb=cxb,
+                                              NH=NH)
+        else:
+            skybkg_spec = box_spec * 0.
+
+        spectrum = np.random.poisson(box_spec + skybkg_spec) + qpb_spec # Total spectrum
+
+        print('# Now saving spectra and region files...')
+        save_spectrum(self,
+                      outdir=outdir,
+                      spectrum=spectrum,
+                      tsim=tsim,
+                      arf=arf,
+                      qpb=qpb_spec_out,
+                      backscal=backscal,
+                      tsim_qpb=tsim_qpb)
+
+    def ExtractEvents(self, tsim, outdir=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+        """
+        Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
+
+        :param tsim: Exposure time of simulation
+        :type tsim: float
+        :param outdir: Name of output directory
+        :type outdir: str
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
+        """
+
+        print('# Compute model box...')
+        phot_box_ima = gen_phot_box(self,
+                                    tsim=tsim,
+                                    with_skybkg=withskybkg,
+                                    lhb=lhb,
+                                    ght=ght,
+                                    ghn=ghn,
+                                    cxb=cxb,
+                                    NH=NH)
+
+        print('# Generate sky events...')
+        X_evt, Y_evt, chan_evt = gen_evt_list(self,
+                                              phot_box_ima=phot_box_ima)
+
+        if self.fwc_spec is None:
+            print('FWC events not extracted yet, skipping QPB event generation')
+
+        if withqpb and self.fwc_spec is not None:
+            print('# Generate QPB events...')
+            X_qpb, Y_qpb, chan_qpb = gen_qpb_evt(self,
+                                                 tsim=tsim)
+
+            X_tot, Y_tot, chan_tot, time_tot = merge_evt((X_evt, X_qpb),
+                                                         (Y_evt, Y_qpb),
+                                                         (chan_evt, chan_qpb),
+                                                         tsim=tsim)
+
+        else:
+
+            X_tot, Y_tot, chan_tot, time_tot = merge_evt((X_evt),
+                                                         (Y_evt),
+                                                         (chan_evt),
+                                                         tsim=tsim)
+
+        self.events = True
+        self.X_evt = X_tot
+        self.Y_evt = Y_tot
+        self.chan_evt = chan_tot
+        self.time_evt = chan_evt
+
+        if outdir is not None:
+
+            save_evt_file(self,
+                          X_evt=X_tot,
+                          Y_evt=Y_tot,
+                          chan_evt=chan_tot,
+                          time_evt=time_tot,
+                          tsim=tsim,
+                          outfile=outdir+'/E'+self.instrument+'_events.fits')
+
+
+
 
 
 

@@ -5,3 +5,4 @@ from .background import *
 from .utils import *
 from .imaging import *
 from .spectral import *
+from .event_file import *

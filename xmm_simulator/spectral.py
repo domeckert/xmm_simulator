@@ -30,7 +30,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
 
     box = xmmsim.box
 
-    pixsize = 30. / box.shape[0]  # arcmin
+    pixsize = xmmsim.box_size / box.shape[0]  # arcmin
 
     # Set region definition
     y, x = np.indices(box[:, :, 0].shape)
@@ -106,7 +106,7 @@ def gen_spec_box(xmmsim, tsim, cra, cdec, rin, rout, regfile=None):
 
 
 
-def gen_spec_evt(xmmsim, X_evt, Y_evt, chan_evt, cra, cdec, rin, rout, regfile=None):
+def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
     """
     Generate a predicted spectrum from a box within an annulus
 
@@ -123,6 +123,10 @@ def gen_spec_evt(xmmsim, X_evt, Y_evt, chan_evt, cra, cdec, rin, rout, regfile=N
         - Backscale
     """
 
+    if not xmmsim.events:
+        print('Event file not extracted yet, aborting')
+        return
+
     # Get mask file
     mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
 
@@ -132,43 +136,52 @@ def gen_spec_evt(xmmsim, X_evt, Y_evt, chan_evt, cra, cdec, rin, rout, regfile=N
 
     pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
 
+    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
+
     npix_out = mask.shape[0]
 
     inmask.close()
 
     # Set region definition
-    y, x = np.indices(mask.shape)
+    y, x = np.indices(xmmsim.box[:, :, 0].shape)
 
-    wcs = set_wcs(xmmsim=xmmsim)
+    wcs_mask = set_wcs(xmmsim=xmmsim, type='mask')
+
+    wcs_box = set_wcs(xmmsim=xmmsim, type='box')
 
     wc = np.array([[cra, cdec]])
 
-    pixcrd = wcs.wcs_world2pix(wc, 1)
+    pixcrd = wcs_mask.wcs_world2pix(wc, 1)
 
     xsrc = pixcrd[0][0] - 1.
 
     ysrc = pixcrd[0][1] - 1.
 
-    thetas = np.hypot(X_evt - xsrc, Y_evt - ysrc) * pixsize  # arcmin
+    pixcrd_box = wcs_box.wcs_world2pix(wc, 1)
 
-    thetas_ima = np.hypot(x - xsrc, y - ysrc) * pixsize
+    xsrc_box = pixcrd_box[0][0] - 1.
+
+    ysrc_box = pixcrd_box[0][1] - 1.
+
+    thetas = np.hypot(xmmsim.X_evt - xsrc, xmmsim.Y_evt - ysrc) * pixsize  # arcmin
+
+    thetas_ima = np.hypot(x - xsrc_box, y - ysrc_box) * pixsize_ori
 
     if regfile is not None:
-
         thetas = region(regfile=regfile,
-                        thetas=thetas,
-                        wcs_inp=wcs,
-                        pixsize=pixsize)
+                                      thetas=thetas,
+                                      wcs_inp=wcs_mask,
+                                      pixsize=pixsize)
 
         thetas_ima = region(regfile=regfile,
-                        thetas=thetas_ima,
-                        wcs_inp=wcs,
-                        pixsize=pixsize)
+                                          thetas=thetas_ima,
+                                          wcs_inp=wcs_box,
+                                          pixsize=pixsize_ori)
 
     test_annulus = np.where(np.logical_and(thetas >= rin, thetas < rout))
 
     # Get photons per channel
-    sel_phot = chan_evt[test_annulus]
+    sel_phot = xmmsim.chan_evt[test_annulus]
 
     # Read RMF
     rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
@@ -180,9 +193,28 @@ def gen_spec_evt(xmmsim, X_evt, Y_evt, chan_evt, cra, cdec, rin, rout, regfile=N
     # Compute BACKSCAL
     sel_area = np.where(np.logical_and(thetas_ima >= rin, thetas_ima < rout))
 
-    backscal_annulus = len(sel_area[0]) * (pixsize * 60.) ** 2 / (0.05 ** 2)
+    backscal_annulus = len(sel_area[0]) * (pixsize_ori * 60.) ** 2 / (0.05 ** 2)
 
-    return spec_sel, backscal_annulus
+    # Compute ARF
+    arfs_sel = xmmsim.all_arfs[sel_area]
+
+    box_sel = xmmsim.box[sel_area]
+
+    arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
+
+    finterp_arf = interp1d(xmmsim.box_ene_mean, arf_mean, fill_value='extrapolate')
+
+    nchan = len(rmf.monte_carlo_energies) - 1
+
+    mc_ene = (rmf.monte_carlo_energies[:nchan] + rmf.monte_carlo_energies[1:]) / 2.
+
+    arf_mean_interp = finterp_arf(mc_ene)
+
+    neg_arf = np.where(arf_mean_interp < 0.)
+
+    arf_mean_interp[neg_arf] = 0.
+
+    return spec_sel, arf_mean_interp, backscal_annulus
 
 
 def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
@@ -243,7 +275,7 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
     hdr['ORIGIN'] = 'UNIGE'
     hdr['CREATOR'] = 'xmm_simulator'
     hdr['TELESCOP'] = ('XMM', 'Telescope (mission) name')
-    hdr['INSTRUME'] = ('EPN', 'Instrument name')
+    hdr['INSTRUME'] = ('E'+xmmsim.instrument, 'Instrument name')
     hdr['OBS_MODE'] = 'FullFrame'
     hdr['FILTER'] = ('Medium', 'Instrument filter in use')
     today = datetime.date(datetime.now())

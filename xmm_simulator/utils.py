@@ -251,6 +251,8 @@ def set_wcs(xmmsim, type='mask'):
 
     else:
 
+        head_mask['CRVAL1'] = 0.
+        head_mask['CRVAL2'] = 0.
         wcs = WCS(head_mask)
 
     return wcs

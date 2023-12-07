@@ -3,6 +3,7 @@ README.md
 setup.py
 xmm_simulator/__init__.py
 xmm_simulator/background.py
+xmm_simulator/event_file.py
 xmm_simulator/imaging.py
 xmm_simulator/simulator.py
 xmm_simulator/spectral.py

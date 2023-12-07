@@ -1,6 +1,6 @@
+numpy
+scipy
 astropy
 matplotlib
-numpy
 pyatomdb
-scipy
 threeML
