@@ -2,7 +2,7 @@ import numpy as np
 from astropy.io import fits
 from .utils import region, set_wcs, get_data_file_path, region_evt
 from threeML.utils.OGIP.response import OGIPResponse
-from scipy.interpolate import interp1d
+from scipy.interpolate import interp1d, RectBivariateSpline
 from datetime import datetime
 import os
 
@@ -167,6 +167,22 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
 
     thetas_ima = np.hypot(x - xsrc_box, y - ysrc_box) * pixsize_ori
 
+    # Recast mask shape into box image shape
+    cx, cy = npix_out / 2., npix_out / 2.
+    cx_box, cy_box = xmmsim.box.shape[1] / 2., xmmsim.box.shape[0] / 2.
+    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
+    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
+    xbox = np.arange(0, xmmsim.box.shape[1], 1) - cx_box
+    ybox = np.arange(0, xmmsim.box.shape[0], 1) - cy_box
+
+    finterp = RectBivariateSpline(ymask, xmask, mask)
+
+    # mask unobserved areas
+    mask_ori = np.floor(finterp(xbox, ybox) + 0.5).astype(int)
+
+    tbm = np.where(mask_ori == 0)
+    thetas_ima[tbm] = -1
+
     if regfile is not None:
         thetas = region_evt(xmmsim=xmmsim,
                             regfile=regfile,
@@ -200,6 +216,9 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
     arfs_sel = xmmsim.all_arfs[sel_area]
 
     box_sel = xmmsim.box[sel_area]
+
+    if np.sum(box_sel) == 0:
+        box_sel = np.ones(len(arfs_sel))
 
     arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
 
