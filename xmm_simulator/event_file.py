@@ -12,6 +12,7 @@ from datetime import datetime
 lhb_ref = 2.92859e-06 # MACS 0949 sky bkg parameters
 ght_ref = 0.220899
 ghn_ref = 5.02297e-07
+cxb_m13_unres = 1.9411e-07  # unresolved CXB fraction at a limiting flux of 1e-15 in the soft band from Moretti+03
 cxb_ref = 7.94099e-07
 NH_ref = 0.05
 
@@ -34,7 +35,11 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
         ghn = ghn_ref
 
     if cxb is None:
-        cxb = cxb_ref
+        if xmmsim.pts:
+            cxb = cxb_m13_unres
+
+        else:
+            cxb = cxb_ref
 
     if NH is None:
         NH = NH_ref
@@ -366,3 +371,21 @@ def save_evt_file(xmmsim, X_evt, Y_evt, chan_evt, time_evt, tsim, outfile):
 
     hdul.close()
 
+def load_events(xmmsim, infile):
+    '''
+    Load events from a previous run into the provided XMMSimulator object
+
+    :param xmmsim:
+    :param infile:
+    :return:
+    '''
+
+    fin = fits.open(infile)
+    din = fin.data[1]
+
+    xmmsim.X_evt = din['X']
+    xmmsim.Y_evt = din['Y']
+    xmmsim.chan_evt = din['ENERGY']
+    xmmsim.time_evt = din['TIME']
+    xmmsim.tsim = fin.header['EXPOSURE']
+    xmmsim.events = True
