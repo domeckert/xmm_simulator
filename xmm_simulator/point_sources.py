@@ -85,15 +85,16 @@ def gen_sources(xmmsim, outfile=None, outreg=None):
     np.savetxt(outfile, np.transpose([srcnum, X_src, Y_src, sel_sources, gamma_src, NH_src, rasrc, decsrc]),
                header='srcnum X Y Fx Gamma NH RA Dec')
 
-    freg = open(outreg, 'w')
-    freg.write('# Region file format: DS9 version 4.1\n')
-    freg.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
-    freg.write('fk5\n')
-    npts = len(X_src)
-    for i in range(npts):
-        freg.write('circle(%g, %g, 30")\n' % (rasrc[i], decsrc[i]))
+    if outreg is not None:
+        freg = open(outreg, 'w')
+        freg.write('# Region file format: DS9 version 4.1\n')
+        freg.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
+        freg.write('fk5\n')
+        npts = len(X_src)
+        for i in range(npts):
+            freg.write('circle(%g, %g, 30")\n' % (rasrc[i], decsrc[i]))
 
-    freg.close()
+        freg.close()
 
 
 def pts_box(xmmsim, source_file):
