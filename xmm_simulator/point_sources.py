@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.interpolate import LinearNDInterpolator
+from. utils import get_data_file_path, set_wcs
 from threeML import PhAbs, Powerlaw
 
 # LogN-LogS parameters from Moretti et al. 2003
@@ -17,8 +18,6 @@ gamma_sig = 0.2
 
 nh_min = 20.5  # Simulating a flat distribution of NH from 20.5 to 23; larger NH is usually not observable
 nh_max = 23.0
-flux_norm_conv = 2.2211e-09  # flux corresponding to a normalization of 1.0
-
 
 def dNdS(S):
     '''
@@ -34,14 +33,19 @@ def dNdS(S):
     return - Ns * pivot ** alpha1 * num / denom
 
 
-def gen_sources(xmmsim, outfile):
+def gen_sources(xmmsim, outfile=None, outreg=None):
     '''
     Create a distribution of fluxes, photon indices and NH, place them randomly within the field and save them to output file
 
     :param xmmsim:
     :param outfile:
+    :param outreg:
     :return:
     '''
+
+    if outfile is None:
+        print('No output file provided, aborting')
+        return
 
     field_area = (xmmsim.box_size / 60.) ** 2
 
@@ -51,7 +55,11 @@ def gen_sources(xmmsim, outfile):
 
     S_grid_15 = np.logspace(-15, -12, 1000)  # cutting at -12 as greater values are highly improbable in a 0.25 square deg area
 
-    prob_dist = dNdS(S_grid_15) / np.sum(dNdS(S_grid_15))
+    dS = (np.log10(S_grid_15[1]) - np.log10(S_grid_15[0])) * S_grid_15 * np.log(10.)
+
+    unnorm = dNdS(S_grid_15) * dS
+
+    prob_dist = unnorm / np.sum(unnorm)
 
     sel_sources = np.random.choice(S_grid_15, size=n_src, p=prob_dist)  # source fluxes
 
@@ -64,8 +72,28 @@ def gen_sources(xmmsim, outfile):
 
     srcnum = np.arange(1, n_src + 1)
 
-    np.savetxt(outfile, np.transpose([srcnum, X_src, Y_src, sel_sources, gamma_src, NH_src]),
-               header='srcnum X Y Fx Gamma NH')
+    wcs = set_wcs(xmmsim, type='box')
+
+    pixcrd = np.array([X_src+1,Y_src+1]).T
+
+    wc = wcs.wcs_pix2world(pixcrd, 1)
+
+    rasrc = wc[:,0]
+
+    decsrc = wc[:,1]
+
+    np.savetxt(outfile, np.transpose([srcnum, X_src, Y_src, sel_sources, gamma_src, NH_src, rasrc, decsrc]),
+               header='srcnum X Y Fx Gamma NH RA Dec')
+
+    freg = open(outreg, 'w')
+    freg.write('# Region file format: DS9 version 4.1\n')
+    freg.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
+    freg.write('fk5\n')
+    npts = len(X_src)
+    for i in range(npts):
+        freg.write('circle(%g, %g, 30")\n' % (rasrc[i], decsrc[i]))
+
+    freg.close()
 
 
 def pts_box(xmmsim, source_file):
@@ -85,3 +113,39 @@ def pts_box(xmmsim, source_file):
     fint = LinearNDInterpolator(template[:, :2], template[:, 2])
 
     # Read source file
+    pts = np.loadtxt(source_file)
+
+    X_pts = pts[:,1]
+    Y_pts = pts[:,2]
+    Fx_pts = pts[:,3]
+    Gamma_pts = pts[:,4]
+    NH_pts = pts[:,5]
+
+    flux_norm_conv = fint(Gamma_pts, NH_pts)
+
+    norm = Fx_pts / flux_norm_conv
+
+    box_pts = np.zeros(xmmsim.box.shape)
+
+    npts = len(X_pts)
+
+    mod = PhAbs() * Powerlaw()
+
+    for i in range(npts):
+
+        mod.NH_1 = 10 ** (NH_pts[i] - 22.)
+        mod.index_2 = -Gamma_pts[i]
+        mod.K_2 = norm[i]
+
+        iX = int(X_pts[i] + 0.5)
+        iY = int(Y_pts[i] + 0.5)
+
+        if iX==xmmsim.box.shape[1]: iX = xmmsim.box.shape[1] - 1
+        if iY==xmmsim.box.shape[0]: iY = xmmsim.box.shape[0] - 1
+
+        box_pts[iY, iX, :] = mod(xmmsim.box_ene_mean) * xmmsim.tsim * xmmsim.all_arfs[iY, iX, :]
+
+    xmmsim.box_pts = box_pts
+    xmmsim.pts = True
+
+

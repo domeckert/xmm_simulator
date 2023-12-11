@@ -7,13 +7,14 @@ from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
 from .spectral import gen_spec_box, save_spectrum, gen_spec_evt
 from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt
+from .point_sources import gen_sources, pts_box
 from scipy.interpolate import interp1d
 
 class XMMSimulator(object):
     """
 
     """
-    def __init__(self, boxfile, ccfpath, instrument,
+    def __init__(self, boxfile, ccfpath, instrument, tsim,
                  box_size=0.5, box_ene=None):
         """
         Constructor of class XMMSimulator
@@ -24,6 +25,8 @@ class XMMSimulator(object):
         :type ccfpath: str
         :param instrument: Instrument to be simulated (PN, MOS1, or MOS2)
         :type instrument: str
+        :param tsim: Simulation exposure time
+        :type tsim: float
         :param box_size: Size of the provided simulation box in degrees (defaults to 0.5)
         :type box_size: float
         :param box_ene: Numpy array containing the energy definition of the box. If None, defaults to a linear grid between 0.1 and 10 keV with a step of 0.02
@@ -111,11 +114,14 @@ class XMMSimulator(object):
         frmf.close()
         self.ebounds = ebounds
 
+        self.tsim = tsim
+
         self.cx = None
         self.cy = None
         self.all_arfs = None
         self.fwc_spec = None
         self.events = False
+        self.pts = False
 
     def ARF_Box(self):
         """
@@ -169,7 +175,49 @@ class XMMSimulator(object):
 
         self.all_arfs = all_arfs
 
-    def ExtractImage(self, tsim, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None, write_arf=False):
+    def Pts(self, infile=None, outfile=None):
+        '''
+        Generate a point source list or read it from a previously loaded file
+
+        :param infile: If provided, name of the input point source list to be loaded from a file.
+        :type infile: str
+        :param outfile: If provided, name of outpout file to save the point source list
+        :type outfile: str
+        :return:
+        '''
+
+        if infile is None and outfile is None:
+            print('No infile or outfile provided, aborting')
+            return
+
+        if infile is not None and outfile is not None:
+            print('Only one of infile and outfile can be provided, aborting')
+            return
+
+        if infile is not None and outfile is None:
+            gen = False
+
+        else:
+            gen = True
+
+        if gen:
+
+            gen_sources(self,
+                        outfile=outfile)
+
+            source_file = outfile
+
+        else:
+
+            source_file = infile
+
+        pts_box(self,
+                source_file=source_file)
+
+        self.pts_file = source_file
+
+
+    def ExtractImage(self, outname, elow=0.5, ehigh=2.0, nbin=10, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None, write_arf=False):
         """
         Extract an image in the energy band (elow, ehigh). The image is Poissonized, convolved with PSF, and background is added.
 
@@ -199,6 +247,13 @@ class XMMSimulator(object):
         :type NH: float
         """
 
+        print('# Generating exposure map...')
+        expmap = exposure_map(self,
+                              tsim=self.tsim,
+                              elow=elow,
+                              ehigh=ehigh,
+                              nbin=nbin)
+
         if self.events:
             print('# Event file found, we will extract the image from the event file')
 
@@ -207,57 +262,64 @@ class XMMSimulator(object):
                                         X_evt=self.X_evt,
                                         Y_evt=self.Y_evt,
                                         chan_evt=self.chan_evt,
-                                        tsim=tsim,
+                                        tsim=self.tsim,
                                         elow=elow,
                                         ehigh=ehigh,
                                         outfile=None)
 
-            print('# Generating exposure map...')
-            expmap = exposure_map(self,
-                                  tsim=tsim,
-                                  elow=elow,
-                                  ehigh=ehigh,
-                                  nbin=nbin)
+            if withqpb:
+
+                print('# Generating QPB map...')
+                qpb_map = gen_qpb_image(self,
+                                        tsim=self.tsim,
+                                        elow=elow,
+                                        ehigh=ehigh)
+
+            else:
+                qpb_map = poisson_map * 0.
+
 
         else:
             print('# No event file found, we will extract the map directly from the image box')
 
-            print('# Generating sky background and exposure maps...')
-            skybkg_map, expmap = gen_skybkg_image(self,
-                                                  tsim=tsim,
-                                                  elow=elow,
-                                                  ehigh=ehigh,
-                                                  nbin=nbin,
-                                                  lhb=lhb,
-                                                  ght=ght,
-                                                  ghn=ghn,
-                                                  cxb=cxb,
-                                                  NH=NH)
-
-            if not withskybkg:
-                skybkg_map = skybkg_map * 0.
-
-            else:
-                qpb_map = skybkg_map * 0.
-
             print('# Generating box image...')
             box_map = gen_image_box(self,
-                                    tsim=tsim,
+                                    tsim=self.tsim,
                                     elow=elow,
                                     ehigh=ehigh,
                                     nbin=nbin)
 
+            if not withskybkg:
+                skybkg_map = box_map * 0.
+
+            else:
+                print('# Generating sky background map...')
+                skybkg_map, expmap = gen_skybkg_image(self,
+                                                      tsim=self.tsim,
+                                                      elow=elow,
+                                                      ehigh=ehigh,
+                                                      nbin=nbin,
+                                                      lhb=lhb,
+                                                      ght=ght,
+                                                      ghn=ghn,
+                                                      cxb=cxb,
+                                                      NH=NH)
+
+
+            if withqpb:
+
+                print('# Generating QPB map...')
+                qpb_map = gen_qpb_image(self,
+                                        tsim=self.tsim,
+                                        elow=elow,
+                                        ehigh=ehigh)
+
+            else:
+                qpb_map = box_map * 0.
+
             print("# Simulating data...")
             poisson_map = np.random.poisson(box_map + qpb_map + skybkg_map)
 
-        if withqpb:
-            print('# Generating QPB map...')
-            qpb_map = gen_qpb_image(self,
-                                    tsim=tsim,
-                                    elow=elow,
-                                    ehigh=ehigh)
-        else:
-            qpb_map = poisson_map * 0.
 
         print('# Saving data into output files...')
         save_maps(self,
@@ -280,12 +342,10 @@ class XMMSimulator(object):
             self.fwc_spec = read_qpb_spectrum(self) * area_tot
 
 
-    def ExtractSpectrum(self, tsim, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractSpectrum(self, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
-        :param tsim: Exposure time of simulation
-        :type tsim: float
         :param outdir: Name of output directory
         :type outdir: str
         :param cra: Right ascension of the center of the annulus
@@ -328,7 +388,7 @@ class XMMSimulator(object):
         else:
             print('# Extracting spectrum...')
             box_spec, arf, backscal = gen_spec_box(self,
-                                                   tsim=tsim,
+                                                   tsim=self.tsim,
                                                    cra=cra,
                                                    cdec=cdec,
                                                    rin=rin,
@@ -352,7 +412,7 @@ class XMMSimulator(object):
                 else:
                     print('# Extracting FWC spectrum...')
 
-                    qpb_spec = np.random.poisson(self.fwc_spec * tsim * bin_width * area_spec / area_tot).astype(int)
+                    qpb_spec = np.random.poisson(self.fwc_spec * self.tsim * bin_width * area_spec / area_tot).astype(int)
 
             else:
                 qpb_spec = box_spec * 0.
@@ -360,7 +420,7 @@ class XMMSimulator(object):
             if withskybkg:
                 print('# Generating sky background spectrum...')
                 skybkg_spec = gen_skybkg_spectrum(self,
-                                                  tsim=tsim,
+                                                  tsim=self.tsim,
                                                   area_spec=area_spec,
                                                   arf=arf,
                                                   lhb=lhb,
@@ -385,7 +445,7 @@ class XMMSimulator(object):
 
             if tsim_qpb is None:
 
-                tsim_qpb = tsim
+                tsim_qpb = self.tsim
 
             print('# Extracting FWC spectrum realization...')
 
@@ -398,18 +458,16 @@ class XMMSimulator(object):
         save_spectrum(self,
                       outdir=outdir,
                       spectrum=spectrum,
-                      tsim=tsim,
+                      tsim=self.tsim,
                       arf=arf,
                       qpb=qpb_spec_out,
                       backscal=backscal,
                       tsim_qpb=tsim_qpb)
 
-    def ExtractEvents(self, tsim, outdir=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractEvents(self, outdir=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
-        :param tsim: Exposure time of simulation
-        :type tsim: float
         :param outdir: Name of output directory
         :type outdir: str
         :param withskybkg: Switch to simulate or not the sky background (defaults to True)
@@ -430,7 +488,7 @@ class XMMSimulator(object):
 
         print('# Compute model box...')
         phot_box_ima = gen_phot_box(self,
-                                    tsim=tsim,
+                                    tsim=self.tsim,
                                     with_skybkg=withskybkg,
                                     lhb=lhb,
                                     ght=ght,
@@ -448,19 +506,19 @@ class XMMSimulator(object):
         if withqpb and self.fwc_spec is not None:
             print('# Generate QPB events...')
             X_qpb, Y_qpb, chan_qpb = gen_qpb_evt(self,
-                                                 tsim=tsim)
+                                                 tsim=self.tsim)
 
             X_tot, Y_tot, chan_tot, time_tot = merge_evt((X_evt, X_qpb),
                                                          (Y_evt, Y_qpb),
                                                          (chan_evt, chan_qpb),
-                                                         tsim=tsim)
+                                                         tsim=self.tsim)
 
         else:
 
             X_tot, Y_tot, chan_tot, time_tot = merge_evt((X_evt),
                                                          (Y_evt),
                                                          (chan_evt),
-                                                         tsim=tsim)
+                                                         tsim=self.tsim)
 
         self.events = True
         self.X_evt = X_tot
@@ -475,7 +533,7 @@ class XMMSimulator(object):
                           Y_evt=Y_tot,
                           chan_evt=chan_tot,
                           time_evt=time_tot,
-                          tsim=tsim,
+                          tsim=self.tsim,
                           outfile=outdir+'/E'+self.instrument+'_events.fits')
 
 

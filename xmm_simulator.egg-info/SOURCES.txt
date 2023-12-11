@@ -5,6 +5,7 @@ xmm_simulator/__init__.py
 xmm_simulator/background.py
 xmm_simulator/event_file.py
 xmm_simulator/imaging.py
+xmm_simulator/point_sources.py
 xmm_simulator/simulator.py
 xmm_simulator/spectral.py
 xmm_simulator/utils.py
@@ -19,6 +20,7 @@ xmm_simulator/fwc/PN_FWC.fits.gz
 xmm_simulator/imgs/MOS1_mask.fits.gz
 xmm_simulator/imgs/MOS2_mask.fits.gz
 xmm_simulator/imgs/PN_mask.fits.gz
+xmm_simulator/pts/templates_pts.dat
 xmm_simulator/rmfs/MOS1.rmf
 xmm_simulator/rmfs/MOS2.rmf
 xmm_simulator/rmfs/PN.rmf

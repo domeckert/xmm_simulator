@@ -97,6 +97,9 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
     # Get photons per channel
     phot_box = xmmsim.box * tsim * xmmsim.all_arfs
 
+    if xmmsim.pts:
+        phot_box = phot_box + xmmsim.box_pts
+
     if with_skybkg:
         for i in range(len(xmmsim.box_ene_mean)):
 
