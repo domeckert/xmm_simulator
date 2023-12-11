@@ -6,7 +6,7 @@ from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, ge
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
 from .spectral import gen_spec_box, save_spectrum, gen_spec_evt
-from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt
+from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt, load_events
 from .point_sources import gen_sources, pts_box
 from scipy.interpolate import interp1d
 
@@ -175,7 +175,7 @@ class XMMSimulator(object):
 
         self.all_arfs = all_arfs
 
-    def Pts(self, infile=None, outfile=None):
+    def Pts(self, infile=None, outfile=None, outreg=None):
         '''
         Generate a point source list or read it from a previously loaded file
 
@@ -203,7 +203,8 @@ class XMMSimulator(object):
         if gen:
 
             gen_sources(self,
-                        outfile=outfile)
+                        outfile=outfile,
+                        outreg=outreg)
 
             source_file = outfile
 
@@ -377,7 +378,7 @@ class XMMSimulator(object):
         if self.events:
             print('# Event file found, we will extract the spectrum from the event file')
 
-            print('# Extracting image from event file...')
+            print('# Extracting spectrum from event file...')
             spectrum, arf, backscal = gen_spec_evt(self,
                                                    cra=cra,
                                                    cdec=cdec,
@@ -515,18 +516,24 @@ class XMMSimulator(object):
 
         else:
 
-            X_tot, Y_tot, chan_tot, time_tot = merge_evt((X_evt),
-                                                         (Y_evt),
-                                                         (chan_evt),
-                                                         tsim=self.tsim)
+            nevt = len(X_evt)
+
+            itime = np.random.rand(nevt) * self.tsim
+
+            args = np.argsort(itime)
+
+            X_tot, Y_tot, chan_tot, time_tot = X_evt[args], Y_evt[args], chan_evt[args], itime[args]
 
         self.events = True
         self.X_evt = X_tot
         self.Y_evt = Y_tot
         self.chan_evt = chan_tot
-        self.time_evt = chan_evt
+        self.time_evt = time_tot
 
         if outdir is not None:
+
+            if not os.path.exists(outdir):
+                os.mkdir(outdir)
 
             save_evt_file(self,
                           X_evt=X_tot,
@@ -536,7 +543,18 @@ class XMMSimulator(object):
                           tsim=self.tsim,
                           outfile=outdir+'/E'+self.instrument+'_events.fits')
 
+    def LoadEvents(self, infile):
+        '''
+        Load events extracted from a previous run into the current session
 
+        :param infile:
+        :return:
+        '''
+
+        print('# Reloading events from file '+infile)
+
+        load_events(self,
+                    infile=infile)
 
 
 
