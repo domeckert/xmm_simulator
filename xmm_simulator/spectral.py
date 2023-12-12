@@ -205,7 +205,7 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
 
     rmf = OGIPResponse(rsp_file=rmf_file)
 
-    (spec_sel, bins_spec) = np.histogram(sel_phot, bins=rmf.monte_carlo_energies)
+    (spec_sel, bins_spec) = np.histogram(sel_phot, bins=rmf.ebounds)
 
     # Compute BACKSCAL
     sel_area = np.where(np.logical_and(thetas_ima >= rin, thetas_ima < rout))
