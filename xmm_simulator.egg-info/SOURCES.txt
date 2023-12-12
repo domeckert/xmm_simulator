@@ -21,6 +21,7 @@ xmm_simulator/imgs/MOS1_mask.fits.gz
 xmm_simulator/imgs/MOS2_mask.fits.gz
 xmm_simulator/imgs/PN_mask.fits.gz
 xmm_simulator/pts/templates_pts.dat
+xmm_simulator/pts/templates_pts_hard.dat
 xmm_simulator/rmfs/MOS1.rmf
 xmm_simulator/rmfs/MOS2.rmf
 xmm_simulator/rmfs/PN.rmf

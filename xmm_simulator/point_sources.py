@@ -5,10 +5,11 @@ from threeML import PhAbs, Powerlaw
 
 # LogN-LogS parameters from Moretti et al. 2003
 cxb_m13_unres = 1.9411e-07  # unresolved CXB fraction at a limiting flux of 1e-15 in the soft band from Moretti+03
-alpha1 = 1.82
-alpha2 = 0.60
-s0 = 1.48e-14
-Ns = 6150.
+alpha1 = 1.57 # hard-band logN-logS
+alpha2 = 0.44
+s0 = 4.5e-15
+Ns = 5300
+
 B = s0 ** (alpha1 - alpha2)
 pivot = 2e-15
 N_gt15 = Ns * pivot ** alpha1 / (1e-15 ** alpha1 + B * 1e-15 ** alpha2)  # per square degree
@@ -70,6 +71,8 @@ def gen_sources(xmmsim, outfile=None, outreg=None):
 
     NH_src = nh_min + (nh_max - nh_min) * np.random.rand(n_src)
 
+    redshifts = np.random.rand(n_src) * 1.5 # assuming flat redshift distribution out to 1.5
+
     srcnum = np.arange(1, n_src + 1)
 
     wcs = set_wcs(xmmsim, type='box')
@@ -82,8 +85,8 @@ def gen_sources(xmmsim, outfile=None, outreg=None):
 
     decsrc = wc[:,1]
 
-    np.savetxt(outfile, np.transpose([srcnum, X_src, Y_src, sel_sources, gamma_src, NH_src, rasrc, decsrc]),
-               header='srcnum X Y Fx Gamma NH RA Dec')
+    np.savetxt(outfile, np.transpose([srcnum, X_src, Y_src, sel_sources, gamma_src, NH_src, redshifts, rasrc, decsrc]),
+               header='srcnum X Y Fx Gamma NH z RA Dec')
 
     if outreg is not None:
         freg = open(outreg, 'w')
@@ -107,11 +110,11 @@ def pts_box(xmmsim, source_file):
     '''
 
     # Get template file
-    template_file = get_data_file_path('pts/templates_pts.dat')
+    template_file = get_data_file_path('pts/templates_pts_hard.dat')
 
     template = np.loadtxt(template_file)
 
-    fint = LinearNDInterpolator(template[:, :2], template[:, 2])
+    fint = LinearNDInterpolator(template[:, :2], template[:, 2], fill_value=np.mean(template[:,2]))
 
     # Read source file
     pts = np.loadtxt(source_file)
@@ -121,6 +124,7 @@ def pts_box(xmmsim, source_file):
     Fx_pts = pts[:,3]
     Gamma_pts = pts[:,4]
     NH_pts = pts[:,5]
+    z_pts = pts[:,6]
 
     flux_norm_conv = fint(Gamma_pts, NH_pts)
 
@@ -137,6 +141,7 @@ def pts_box(xmmsim, source_file):
         mod.NH_1 = 10 ** (NH_pts[i] - 22.)
         mod.index_2 = -Gamma_pts[i]
         mod.K_2 = norm[i]
+        mod.redshift_1 = z_pts[i]
 
         iX = int(X_pts[i] + 0.5)
         iY = int(Y_pts[i] + 0.5)
