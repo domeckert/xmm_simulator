@@ -383,11 +383,11 @@ def load_events(xmmsim, infile):
     '''
 
     fin = fits.open(infile)
-    din = fin.data[1]
+    din = fin[1].data
 
     xmmsim.X_evt = din['X']
     xmmsim.Y_evt = din['Y']
     xmmsim.chan_evt = din['ENERGY']
     xmmsim.time_evt = din['TIME']
-    xmmsim.tsim = fin.header['EXPOSURE']
+    xmmsim.tsim = fin[1].header['EXPOSURE']
     xmmsim.events = True
