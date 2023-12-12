@@ -149,6 +149,8 @@ def gen_evt_list(xmmsim, phot_box_ima):
 
     bin_width = rmf.monte_carlo_energies[1:] - rmf.monte_carlo_energies[:nchan]
 
+    emb = (rmf.ebounds[1:] + rmf.ebounds[:-1]) / 2.
+
     ima_tot = np.sum(phot_box_ima, axis=2) * xmmsim.box_ene_width
 
     photon_map = np.random.poisson(ima_tot)
@@ -189,7 +191,7 @@ def gen_evt_list(xmmsim, phot_box_ima):
 
         spec_prob = spec_conv / np.sum(spec_conv)
 
-        evts = np.random.choice(mc_ene, p=spec_prob, size=nphot_pix)
+        evts = np.random.choice(emb, p=spec_prob, size=nphot_pix)
 
         chan_evt = np.append(chan_evt, evts)
 
