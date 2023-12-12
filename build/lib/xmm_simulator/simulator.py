@@ -6,7 +6,7 @@ from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, ge
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
 from .spectral import gen_spec_box, save_spectrum, gen_spec_evt
-from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt
+from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt, load_events
 from .point_sources import gen_sources, pts_box
 from scipy.interpolate import interp1d
 
@@ -543,7 +543,18 @@ class XMMSimulator(object):
                           tsim=self.tsim,
                           outfile=outdir+'/E'+self.instrument+'_events.fits')
 
+    def LoadEvents(self, infile):
+        '''
+        Load events extracted from a previous run into the current session
 
+        :param infile:
+        :return:
+        '''
+
+        print('# Reloading events from file '+infile)
+
+        load_events(self,
+                    infile=infile)
 
 
 
