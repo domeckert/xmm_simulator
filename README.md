@@ -46,7 +46,7 @@ Finally, the user had the option of including randomly-positioned point sources 
 
     xmmsim.Pts(outfile='/path/to/output/file',
                 infile=None,
-                regfile='/path/to/output/region/file')
+                outreg='/path/to/output/region/file')
 
 The user should provide only one of _infile_ and _outfile_. If _outfile_ is not None, a new source list is generated and stored into the provided output file. If _infile_ is provided, a previously extracted point source file is reloaded.
 
@@ -54,7 +54,7 @@ The user should provide only one of _infile_ and _outfile_. If _outfile_ is not 
 
 We are now ready to extract a list of simulated events (position, energy and time) from the provided data cube
 
-    xmmsim.ExtractEvents(outname='/path/to/output/directory',
+    xmmsim.ExtractEvents(outdir='/path/to/output/directory',
                         withskybkg=True, # Turn on/off sky background 
                         withqpb=True, # Turn on/off NXB
                         cxb=None, # Cosmic X-ray background norm per arcmin2, if None set to default value
