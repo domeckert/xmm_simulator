@@ -307,6 +307,8 @@ def sum_maps(dir, maps, instruments, pnfact):
     :param instruments:
     :param pnfact:
     """
+    cwd = os.getcwd()
+
     os.chdir(dir)
 
     nmaps = len(maps)
@@ -368,6 +370,7 @@ def sum_maps(dir, maps, instruments, pnfact):
         fqpb.writeto('epic_qpb.fits', overwrite=True)
         fqpb.close()
 
+    os.chdir(cwd)
 
 
 
