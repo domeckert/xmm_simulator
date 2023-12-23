@@ -15,7 +15,7 @@ class XMMSimulator(object):
 
     """
     def __init__(self, boxfile, ccfpath, instrument, tsim,
-                 box_size=0.5, box_ene=None):
+                 box_size=0.5, box_ene=None, abund='angr'):
         """
         Constructor of class XMMSimulator
 
@@ -31,6 +31,8 @@ class XMMSimulator(object):
         :type box_size: float
         :param box_ene: Numpy array containing the energy definition of the box. If None, defaults to a linear grid between 0.1 and 10 keV with a step of 0.02
         :type box_ene: numpy.ndarray
+        :param abund: Solar abundance table. Can be set to 'angr' (Anders & Grevesse 1988) or 'aspl' (Asplund et al. 2009). Defaults to 'angr'
+        :type abund: str
         """
 
         try:
@@ -122,6 +124,11 @@ class XMMSimulator(object):
         self.fwc_spec = None
         self.events = False
         self.pts = False
+        if abund!='angr' and abund!='aspl':
+            print('Unknown abundance table %s, defaulting to angr')
+            self.abund = 'angr'
+        else:
+            self.abund = abund
 
     def ARF_Box(self):
         """
@@ -304,7 +311,8 @@ class XMMSimulator(object):
                                                       ght=ght,
                                                       ghn=ghn,
                                                       cxb=cxb,
-                                                      NH=NH)
+                                                      NH=NH,
+                                                      abund=self.abund)
 
 
             if withqpb:
@@ -343,7 +351,8 @@ class XMMSimulator(object):
             self.fwc_spec = read_qpb_spectrum(self) * area_tot
 
 
-    def ExtractSpectrum(self, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True, withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+    def ExtractSpectrum(self, outdir, cra, cdec, rin, rout, tsim_qpb=None, regfile=None, withskybkg=True,
+                        withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
         """
         Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
 
@@ -428,7 +437,8 @@ class XMMSimulator(object):
                                                   ght=ght,
                                                   ghn=ghn,
                                                   cxb=cxb,
-                                                  NH=NH)
+                                                  NH=NH,
+                                                  abund=self.abund)
             else:
                 skybkg_spec = box_spec * 0.
 
@@ -495,7 +505,8 @@ class XMMSimulator(object):
                                     ght=ght,
                                     ghn=ghn,
                                     cxb=cxb,
-                                    NH=NH)
+                                    NH=NH,
+                                    abund=self.abund)
 
         print('# Generate sky events...')
         X_evt, Y_evt, chan_evt = gen_evt_list(self,

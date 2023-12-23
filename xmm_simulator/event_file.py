@@ -16,7 +16,7 @@ cxb_m13_unres = 1.9411e-07  # unresolved CXB fraction at a limiting flux of 1e-1
 cxb_ref = 7.94099e-07
 NH_ref = 0.05
 
-def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None, abund='angr'):
     """
     Generate a box expectation value in photon/keV , convolved with the PSF and multiplied by the detector mask
 
@@ -77,6 +77,10 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
     if with_skybkg:
         modlhb = APEC()
         modgh = APEC()
+        if abund=='aspl':
+            modlhb.abundance_table = 'Lodd09'
+            modgh.abundance_table = 'Lodd09'
+
         modcxb = Powerlaw()
 
         #modlhb.init_session()
@@ -91,6 +95,9 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
         modcxb.index = -1.46
         modcxb.K = cxb
         modphabs = PhAbs()
+        if abund == 'aspl':
+            modphabs.abundance_table = 'ASPL'
+
         #modphabs.init_xsect()
 
         modphabs.NH = NH

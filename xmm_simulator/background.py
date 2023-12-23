@@ -140,7 +140,7 @@ def gen_qpb_image(xmmsim, tsim, elow=0.5, ehigh=2.0):
 
     return bkg_map
 
-def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=None, cxb=None, NH=None, abund='angr'):
     """
     Generate a sky background spectrum for a given observation source area
 
@@ -165,6 +165,10 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
 
     modlhb = APEC()
     modgh = APEC()
+    if abund == 'aspl':
+        modlhb.abundance_table = 'Lodd09'
+        modgh.abundance_table = 'Lodd09'
+
     modcxb = Powerlaw()
 
     #modlhb.init_session()
@@ -179,6 +183,8 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     modcxb.index = -1.46
     modcxb.K = cxb
     modphabs = PhAbs()
+    if abund == 'aspl':
+        modphabs.abundance_table = 'ASPL'
     #modphabs.init_xsect()
 
     modphabs.NH = NH
@@ -208,7 +214,7 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     return spec_conv
 
 
-def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=None, ghn=None, cxb=None, NH=None, abund='angr'):
     """
 
     :param xmmsim:XMMSimulator
@@ -262,6 +268,10 @@ def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=N
     # Set up sky background model
     modlhb = APEC()
     modgh = APEC()
+    if abund == 'aspl':
+        modlhb.abundance_table = 'Lodd09'
+        modgh.abundance_table = 'Lodd09'
+
     modcxb = Powerlaw()
 
     #modlhb.init_session()
@@ -276,6 +286,8 @@ def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=N
     modcxb.index = -1.46
     modcxb.K = cxb
     modphabs = PhAbs()
+    if abund == 'aspl':
+        modphabs.abundance_table = 'ASPL'
     #modphabs.init_xsect()
 
     modphabs.NH = NH
