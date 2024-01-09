@@ -558,7 +558,8 @@ class XMMSimulator(object):
         '''
         Load events extracted from a previous run into the current session
 
-        :param infile:
+        :param infile: Input file
+        :type infile: str
         :return:
         '''
 
