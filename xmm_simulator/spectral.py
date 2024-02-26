@@ -271,10 +271,18 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
     elif xmmsim.instrument == 'PN':
         pref = 'pnS003'
 
-    name_spec = outdir + '/'+ pref + '-obj-'+ outdir + '.pi'
-    arf_name = outdir + '/'+ pref + '-' + outdir + '.arf'
-    bkg_name = outdir + '/'+ pref + '-back-'+ outdir + '.pi'
-    rmf_name = outdir + '/'+ pref + '-' + outdir + '.rmf'
+    nam = None
+    if '/' not in outdir:
+        nam = outdir
+    else:
+        tl = outdir.split('/')
+        ntl = len(tl)
+        nam = tl[ntl-1]
+
+    name_spec = outdir + '/'+ pref + '-obj-'+ nam + '.pi'
+    arf_name = outdir + '/'+ pref + '-' + nam + '.arf'
+    bkg_name = outdir + '/'+ pref + '-back-'+ nam + '.pi'
+    rmf_name = outdir + '/'+ pref + '-' + nam + '.rmf'
 
     os.system('cp %s %s' % (rmf_file, rmf_name))
 
@@ -368,7 +376,7 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
         hdr['ORIGIN'] = 'UNIGE'
         hdr['CREATOR'] = 'xmm_simulator'
         hdr['TELESCOP'] = 'XMM'
-        hdr['INSTRUME'] = 'EPN'
+        hdr['INSTRUME'] = 'E'+xmmsim.instrument
         hdr['OBS_MODE'] = 'FullFrame'
         hdr['FILTER'] = 'Medium'
         hdr['DATE'] = today.isoformat()
