@@ -76,6 +76,22 @@ def calc_arf(theta, ebound_lo, ebound_hi, xmmsim):
 
     arf = area_ebound * vig_ebound * corr_ebound * filter_ebound * qeff_ebound
 
+    if np.any(arf<0.):
+
+        print('WARNING: some negative ARF value detected, set to zero')
+
+        negarf = np.where(arf<0.)
+
+        arf[negarf] = 0.
+
+    if np.any(np.isnan(arf)):
+
+        print('WARNING: some NaN ARF value detected, set to zero')
+
+        nanarf = np.where(np.isnan(arf))
+
+        arf[nanarf] = 0.
+
     return arf
 
 
