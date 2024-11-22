@@ -237,6 +237,115 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
     return spec_sel, arf_mean_interp, backscal_annulus
 
 
+def gen_spec_evt_pix(xmmsim, pixlist):
+    """
+    Generate a predicted spectrum from image pixels in pixlist
+
+    :param xmmsim:
+    :param pixlist:
+    :return:
+        - Spectrum
+        - ARF
+        - Backscale
+    """
+
+    if not xmmsim.events:
+        print('Event file not extracted yet, aborting')
+        return
+
+    # Get mask file
+    mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
+
+    inmask = fits.open(mask_file)
+
+    mask = inmask[1].data
+
+    pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
+    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
+
+    #Pavement for the original box (e.g. 512x512)
+    xx_origin, yy_origin = np.meshgrid(np.arange(xmmsim.box.shape[0]), np.arange(xmmsim.box.shape[1]))
+
+    npix_out = mask.shape[0]
+    inmask.close()
+
+    # Set region definition
+    wcs_mask = set_wcs(xmmsim=xmmsim, type='mask')
+
+    wcs_box = set_wcs(xmmsim=xmmsim, type='box')
+
+
+    # Recast mask shape into box image shape
+    cx, cy = npix_out / 2., npix_out / 2.
+    cx_box, cy_box = xmmsim.box.shape[1] / 2., xmmsim.box.shape[0] / 2.
+    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
+    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
+    xbox = np.arange(0, xmmsim.box.shape[1], 1) - cx_box
+    ybox = np.arange(0, xmmsim.box.shape[0], 1) - cy_box
+
+    finterp = RectBivariateSpline(ymask, xmask, mask)
+
+    # mask unobserved areas
+    mask_ori = np.floor(finterp(xbox, ybox) + 0.5).astype(int)
+    tbm = np.where(mask_ori == 0)
+    xx_origin[tbm] = -1
+    yy_origin[tbm] = -1
+
+    evt_pix_tosel = np.vstack([xmmsim.Y_evt, xmmsim.X_evt]).T
+
+    #select photons within pixlist
+    pixels_set = set(map(tuple, pixlist))
+    is_selected = np.array([tuple(photon) in pixels_set for photon in evt_pix_tosel])
+
+    # Get photons per channel
+    sel_phot = xmmsim.chan_evt[is_selected]
+
+    # Read RMF
+    rmf_file = get_data_file_path('rmfs/%s.rmf' % (xmmsim.instrument))
+
+    rmf = OGIPResponse(rsp_file=rmf_file)
+
+    (spec_sel, bins_spec) = np.histogram(sel_phot, bins=rmf.ebounds)
+
+    # Compute BACKSCAL
+    #find pixels in the original box hit by events
+    sky_coords = wcs_mask.pixel_to_world(pixlist[:,1], pixlist[:,0])
+    pixlist_orig_x, pixlist_orig_y = wcs_box.world_to_pixel(sky_coords)
+    pixlist_orig_x = np.floor(pixlist_orig_x + 0.5).astype(int)
+    pixlist_orig_y = np.floor(pixlist_orig_y + 0.5).astype(int)
+
+    pixlist_orig = np.vstack([pixlist_orig_x, pixlist_orig_y]).T
+    pixels_set_orig = set(map(tuple, pixlist_orig))
+
+    sel_area_ = np.array(
+        [tuple(pix) in pixels_set_orig for pix in np.vstack([xx_origin.ravel(), yy_origin.ravel()]).T]).reshape(
+        xx_origin.shape)
+    sel_area = np.where(sel_area_)
+    backscal_pixels = len(sel_area[0]) * (pixsize_ori * 60.) ** 2 / (0.05 ** 2)
+
+    # Compute ARF
+    arfs_sel = xmmsim.all_arfs[sel_area]
+    box_sel = xmmsim.box[sel_area]
+    if np.sum(box_sel) == 0:
+        box_sel = np.ones(len(arfs_sel))
+
+    arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
+
+    finterp_arf = interp1d(xmmsim.box_ene_mean, arf_mean, fill_value='extrapolate')
+
+    nchan = len(rmf.monte_carlo_energies) - 1
+
+    mc_ene = (rmf.monte_carlo_energies[:nchan] + rmf.monte_carlo_energies[1:]) / 2.
+
+    arf_mean_interp = finterp_arf(mc_ene)
+
+    neg_arf = np.where(arf_mean_interp < 0.)
+
+    arf_mean_interp[neg_arf] = 0.
+
+    return spec_sel, arf_mean_interp, backscal_pixels
+
+
 def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
     """
 

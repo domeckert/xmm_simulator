@@ -5,7 +5,7 @@ from astropy.cosmology import FlatLambdaCDM
 from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, gen_qpb_spectrum, tot_area, read_qpb_spectrum
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
-from .spectral import gen_spec_box, save_spectrum, gen_spec_evt
+from .spectral import gen_spec_box, save_spectrum, gen_spec_evt, gen_spec_evt_pix
 from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt, load_events
 from .point_sources import gen_sources, pts_box
 from scipy.interpolate import interp1d
@@ -456,6 +456,72 @@ class XMMSimulator(object):
 
             if tsim_qpb is None:
 
+                tsim_qpb = self.tsim
+
+            print('# Extracting FWC spectrum realization...')
+
+            qpb_spec_out = np.random.poisson(self.fwc_spec * tsim_qpb * bin_width * area_spec / area_tot).astype(int)
+
+        else:
+            qpb_spec_out = None
+
+        print('# Now saving spectra and region files...')
+        save_spectrum(self,
+                      outdir=outdir,
+                      spectrum=spectrum,
+                      tsim=self.tsim,
+                      arf=arf,
+                      qpb=qpb_spec_out,
+                      backscal=backscal,
+                      tsim_qpb=tsim_qpb)
+
+    def ExtractSpectrumVoronoi(self, outdir, pixlist, tsim_qpb=None, regfile=None, withskybkg=True,
+                               withqpb=True, lhb=None, ght=None, ghn=None, cxb=None, NH=None):
+        """
+        Extract the spectrum, ARF and background file for an annulus between rin and rout. Regions can be masked by providing a DS9 region file.
+
+        :param outdir: Name of output directory
+        :type outdir: str
+        :param pixlist: Array with pixels chosen for spectral extraction
+        :type pixlist: np array (N,2)
+        :param regfile: DS9 region file containing the definition of regions to be excluded
+        :type regfile: str
+        :param withskybkg: Switch to simulate or not the sky background (defaults to True)
+        :type withskybkg: bool
+        :param withqpb: Switch to simulate or not the quiescent particle background (defaults to True)
+        :type withqpb: bool
+        :param lhb: Local Hot Bubble normalization per square arcmin
+        :type lhb: float
+        :param ght: Galactic Halo temperature in keV
+        :type ght: float
+        :param ghn: Galactic Halo normalization per square arcmin
+        :type ghn: float
+        :param cxb: Cosmic X-ray background normalization per square arcmin
+        :type cxb: float
+        :param NH: Absorption column density
+        :type NH: float
+        """
+
+        if self.events:
+            print('# Event file found, we will extract the spectrum from the event file')
+
+            print('# Extracting spectrum from event file...')
+            spectrum, arf, backscal = gen_spec_evt_pix(self, pixlist=pixlist)
+
+        else:
+            print('# You need to generate the event file first...terminating.')
+            return
+        if withqpb:
+
+            area_spec = backscal / 60. ** 2 * (0.05 ** 2)  # arcmin^2
+
+            area_tot = tot_area(self)
+
+            emin, emax = self.ebounds['E_MIN'], self.ebounds['E_MAX']
+
+            bin_width = emax - emin
+
+            if tsim_qpb is None:
                 tsim_qpb = self.tsim
 
             print('# Extracting FWC spectrum realization...')
