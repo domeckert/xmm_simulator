@@ -497,13 +497,81 @@ def save_spectrum(xmmsim, outdir, spectrum, tsim, arf, qpb, backscal, tsim_qpb):
         hdul.close()
 
 
+def save_spectrum_rassbkg(outdir, p2rass_rsp, spectrum, tsim, area_spec):
+    """
+    Function to save a mock generated rass background by the gen_skybkg_spectrum_rass in spectral.py
+    The 'spectrum' passed to this function should be a possion realization of the model.
+    :param outdir: Output directory to store the rass spectrum
+    :param p2rass_rsp: Path to the rass response file
+    :param spectrum: RASS spectrum to save
+    :param tsim: Exposure time
+    :param area_spec: Source area in square arcmin
+    :return:
+    """
+
+    if not os.path.exists(outdir):
+        os.mkdir(outdir)
+
+    rsp_file = p2rass_rsp
 
 
+    pref = 'rass_spectrum'
 
+    nam = None
+    if '/' not in outdir:
+        nam = outdir
+    else:
+        tl = outdir.split('/')
+        ntl = len(tl)
+        nam = tl[ntl - 1]
 
+    name_spec = outdir + '/' + pref + '-obj-' + nam + '.pi'
 
+    tsim_eff = tsim * area_spec
 
+    # Write spectrum
+    channel = np.arange(0, len(spectrum), 1)
 
+    hdul = fits.HDUList([fits.PrimaryHDU()])
+    cols = []
+    cols.append(fits.Column(name='CHANNEL', format='J', array=channel))
+    cols.append(fits.Column(name='COUNTS', format='J', unit='count', array=spectrum))
+    cols = fits.ColDefs(cols)
+    tbhdu = fits.BinTableHDU.from_columns(cols, name='SPECTRUM')
+    hdr = tbhdu.header
+    hdr['HDUCLASS'] = ('OGIP', 'Format conforms to OGIP/GSFC conventions')
+    hdr['HDUCLAS1'] = ('SPECTRUM', 'File contains a spectrum')
+    hdr['HDUCLAS2'] = ('TOTAL', 'File contains gross counts')
+    hdr['HDUCLAS3'] = ('COUNT', 'Spectrum is stored as counts')
+    hdr['HDUVERS1'] = ('1.1.0', 'Version of format')
+    hdr['ORIGIN'] = 'UNIGE'
+    hdr['CREATOR'] = 'xmm_simulator'
+    hdr['TELESCOP'] = ('ROSAT', 'Telescope (mission) name')
+    hdr['INSTRUME'] = ('PSPCC', 'Instrument name')
+    hdr['OBS_MODE'] = 'FullFrame'
+    hdr['FILTER'] = ('Medium', 'Instrument filter in use')
+    today = datetime.date(datetime.now())
+    hdr['DATE'] = today.isoformat()
+    hdr['RA_OBJ'] = 0.0
+    hdr['DEC_OBJ'] = 0.0
+    hdr['DATE-OBS'] = today.isoformat()
+    hdr['EXPOSURE'] = (tsim_eff, 'Weighted live time of CCDs in the extraction region')
+    hdr['CORRFILE'] = 'NONE'
+    hdr['CORRSCAL'] = 1.
+    hdr['POISSERR'] = (True, 'Poisson errors appropriate')
+    hdr['QUALITY'] = 0
+    hdr['GROUPING'] = 0
+    hdr['RESPFILE'] = rsp_file  # 'none'#(rmf_name, 'redistribution matrix')
+    hdr['ANCRFILE'] = 'none'  # (arf_name, 'ancillary response')
+    hdr['BACKFILE'] = 'none'  # (bkg_name, 'Background FITS file')
+    hdr['CHANTYPE'] = ('PI', 'Type of channel data')
+    hdr['DETCHANS'] = len(channel)
+    hdr['AREASCAL'] = (1.0, 'Nominal scaling factor for data')
+    hdr['BACKSCAL'] = (1.0, 'Scaling factor for background')  # Sum of area in XMM units, 0.05 arcsec
+    hdr['CTS'] = np.sum(spectrum).astype(int)
+    hdul.append(tbhdu)
 
+    hdul.writeto(name_spec, overwrite=True)
+    print('Spectrum written to file', name_spec)
 
-
+    hdul.close()
