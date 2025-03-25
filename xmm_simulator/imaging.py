@@ -47,6 +47,45 @@ def psf_convole(image, pixsize, xmmsim):
 
     return blurred
 
+
+
+def psf_convole_evt(Xevt, Yevt, pixsize, xmmsim):
+    """
+    Convolve an event file list with the telescope's on-axis PSF
+    :param Xevt:
+    :param Yevt:
+    :param xmmsim:
+    :return:
+    """
+
+    fpsf = fits.open(xmmsim.ccfpath + xmmsim.psf_file)
+
+    king_params = fpsf['KING_PARAMS'].data
+
+    onaxis_params = king_params['PARAMS'][0] # Sticking to on-axis, outside doesn't matter so much
+
+    r0 = onaxis_params[0] / 60.  # core radius in arcmin
+
+    alpha = onaxis_params[1] # outer slope
+
+    fpsf.close()
+
+    num_photons = len(Xevt)  # Number of photons
+    u = np.random.uniform(0, 1, num_photons)  # Uniform random numbers
+    #Draw offsets from the King's CDF
+    r_samples = r0 * np.sqrt((1 / u) ** (1 / (alpha - 1)) - 1)
+    theta_samples = np.random.uniform(0, 2 * np.pi, size=num_photons)  # Random angles
+
+    # Convert to Cartesian offsets
+    delta_x = r_samples * np.cos(theta_samples) / pixsize  # Convert arcmin to pixels
+    delta_y = r_samples * np.sin(theta_samples) / pixsize  # Convert arcmin to pixels
+
+    # Apply the PSF effect: shift the photon positions
+    Xpix_blurred = np.round(Xevt + delta_x).astype(int)
+    Ypix_blurred = np.round(Yevt + delta_y).astype(int)
+
+    return Xpix_blurred, Ypix_blurred
+
 def exposure_map(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10):
     """
     Generate an effective exposure map including vignetting curve in an input energy band

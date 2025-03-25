@@ -52,7 +52,8 @@ def gen_sources(xmmsim, outfile=None, outreg=None):
 
     n_src = np.random.poisson(N_gt15 * field_area)
 
-    npix = xmmsim.box.shape[0]
+    #npix = xmmsim.box.shape[0]
+    npix = xmmsim.boxshape0
 
     S_grid_15 = np.logspace(-15, -12, 1000)  # cutting at -12 as greater values are highly improbable in a 0.25 square deg area
 
@@ -130,7 +131,8 @@ def pts_box(xmmsim, source_file):
 
     norm = Fx_pts / flux_norm_conv
 
-    box_pts = np.zeros(xmmsim.box.shape)
+    #box_pts = np.zeros(xmmsim.box.shape)
+    box_pts = np.zeros((xmmsim.boxshape0, xmmsim.boxshape1, xmmsim.boxshape2))
 
     npts = len(X_pts)
 
@@ -146,8 +148,10 @@ def pts_box(xmmsim, source_file):
         iX = int(X_pts[i] + 0.5)
         iY = int(Y_pts[i] + 0.5)
 
-        if iX==xmmsim.box.shape[1]: iX = xmmsim.box.shape[1] - 1
-        if iY==xmmsim.box.shape[0]: iY = xmmsim.box.shape[0] - 1
+        #if iX==xmmsim.box.shape[1]: iX = xmmsim.box.shape[1] - 1
+        #if iY==xmmsim.box.shape[0]: iY = xmmsim.box.shape[0] - 1
+        if iX==xmmsim.boxshape1: iX = xmmsim.boxshape1 - 1
+        if iY==xmmsim.boxshape0: iY = xmmsim.boxshape0 - 1
 
         box_pts[iY, iX, :] = mod(xmmsim.box_ene_mean) * xmmsim.tsim * xmmsim.all_arfs[iY, iX, :]
 

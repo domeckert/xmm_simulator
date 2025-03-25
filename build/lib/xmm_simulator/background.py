@@ -214,6 +214,82 @@ def gen_skybkg_spectrum(xmmsim, tsim, area_spec, arf, lhb=None, ght=None, ghn=No
     return spec_conv
 
 
+
+def gen_skybkg_spectrum_rass(p2rass_rsp, tsim, area_spec, lhb=None, ght=None, ghn=None, cxb=None, NH=None, abund='angr'):
+    """
+    Generate a sky simulated RASS sky background spectrum
+    :param p2rass_rsp: Path to the rass response file
+    :param_tsim: exposure time of the RASS exposure
+    :param area_spec: Source area in square arcmin
+    :return: spec_bkg: Sky background photon spectrum
+    """
+
+    if lhb is None:
+        lhb = lhb_ref
+
+    if ght is None:
+        ght = ght_ref
+
+    if ghn is None:
+        ghn = ghn_ref
+
+    if cxb is None:
+        cxb = cxb_ref
+
+    if NH is None:
+        NH = NH_ref
+
+    modlhb = APEC()
+    modgh = APEC()
+    if abund == 'aspl':
+        modlhb.abundance_table = 'Lodd09'
+        modgh.abundance_table = 'Lodd09'
+
+    modcxb = Powerlaw()
+
+    #modlhb.init_session()
+    #modgh.init_session()
+
+    modlhb.kT = 0.11
+    modlhb.K = lhb
+    modlhb.redshift = 0.
+    modgh.kT = ght
+    modgh.K = ghn
+    modgh.redshift = 0.
+    modcxb.index = -1.46
+    modcxb.K = cxb
+    modphabs = PhAbs()
+    if abund == 'aspl':
+        modphabs.abundance_table = 'ASPL'
+    #modphabs.init_xsect()
+
+    modphabs.NH = NH
+
+    modsource = area_spec * (modlhb + modphabs * (modgh + modcxb))
+
+    # Read RMF
+    rsp_file = p2rass_rsp
+
+    rsp = OGIPResponse(rsp_file=rsp_file)
+
+    nchan = len(rsp.monte_carlo_energies) - 1
+
+    mc_ene = (rsp.monte_carlo_energies[:nchan] + rsp.monte_carlo_energies[1:]) / 2.
+
+    # Compute model
+    spec_phot = modsource(mc_ene) * tsim
+
+    # Convolve with RMF
+    bin_width = rsp.monte_carlo_energies[1:] - rsp.monte_carlo_energies[:nchan]
+
+    spec_conv = rsp.convolve(spec_phot * bin_width)
+
+    modlhb.clean()
+    modgh.clean()
+
+    return spec_conv
+
+
 def gen_skybkg_image(xmmsim, tsim, elow=0.5, ehigh=2.0, nbin=10, lhb=None, ght=None, ghn=None, cxb=None, NH=None, abund='angr'):
     """
 

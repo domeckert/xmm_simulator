@@ -240,29 +240,29 @@ def set_wcs(xmmsim, type='mask'):
 
     inmask.close()
 
-    ima = xmmsim.box[:, :, 0]
-
-    hdu = fits.PrimaryHDU(ima)
-
     npix_mask = mask.shape[0]
 
-    npix_box = ima.shape[0]
+    #npix_box = ima.shape[0]
+    npix_box = xmmsim.boxshape0
 
     if type == 'box':
-        header = hdu.header
+        pixsize_ori = xmmsim.box_size / 60. / xmmsim.boxshape1  # degree
 
-        pixsize_ori = xmmsim.box_size / 60. / xmmsim.box.shape[1] # degree
+        if xmmsim.box:
+            ima = xmmsim.box[:, :, 0]
+            hdu = fits.PrimaryHDU(ima)
+            header = hdu.header
+        else:
+            header = fits.Header()
 
         header['CDELT1'] = - pixsize_ori
         header['CDELT2'] = pixsize_ori
         header['CRPIX1'] = head_mask['CRPIX1'] * npix_box / npix_mask
         header['CRPIX2'] = head_mask['CRPIX2'] * npix_box / npix_mask
-
         header['CTYPE1'] = head_mask['CTYPE1']
         header['CTYPE2'] = head_mask['CTYPE2']
         header['CRVAL1'] = 0.
         header['CRVAL2'] = 0.
-
         wcs = WCS(header)
 
     else:
