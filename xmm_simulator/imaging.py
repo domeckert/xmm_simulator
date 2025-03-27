@@ -71,9 +71,18 @@ def psf_convole_evt(Xevt, Yevt, pixsize, xmmsim):
     fpsf.close()
 
     num_photons = len(Xevt)  # Number of photons
+
     u = np.random.uniform(0, 1, num_photons)  # Uniform random numbers
+    #Analytical method
     #Draw offsets from the King's CDF
-    r_samples = r0 * np.sqrt((1 / u) ** (1 / (alpha - 1)) - 1)
+    #r_samples = r0 * np.sqrt((1 / u) ** (1 / (alpha - 1)) - 1)
+
+    #Numerical method
+    offsets = np.geomspace(1e-4, 50, 1000)
+    king_profile = (1 + (offsets / r0) ** 2) ** (-alpha)
+    king_cdf = np.cumsum(king_profile)/np.sum(king_profile)
+    r_samples = np.interp(u, king_cdf, offsets)
+
     theta_samples = np.random.uniform(0, 2 * np.pi, size=num_photons)  # Random angles
 
     # Convert to Cartesian offsets

@@ -64,7 +64,7 @@ class XMMSimulator(object):
 
             self.box = fb[0].data
 
-            self.pixsize = self.box_size / self.box.shape[0]
+            self.pixsize_ori = self.box_size / self.box.shape[0]
 
             self.boxshape0 = self.box.shape[0]
             self.boxshape1 = self.box.shape[1]
@@ -75,10 +75,10 @@ class XMMSimulator(object):
         else:
             self.box = None
             self.evtfile_input = evtfile_input
-            self.boxshape0 = 100#512
-            self.boxshape1 = 100#512
-            self.boxshape2 = 99#495
-            self.pixsize = self.box_size / self.boxshape0
+            self.boxshape0 = 512#512
+            self.boxshape1 = 512#512
+            self.boxshape2 = 495#495
+            self.pixsize_ori = self.box_size / self.boxshape0
 
 
         if box_ene is None:
@@ -166,7 +166,7 @@ class XMMSimulator(object):
         Compute the ARFs for each point on the box
 
         """
-        #redefined by rseppi as self.pixsize
+        #redefined by rseppi as self.pixsize_ori
         #pixsize = self.box_size / self.box.shape[0]  # by default box size is 30 arcmin
 
         #y, x = np.indices(self.box[:, :, 0].shape)
@@ -182,7 +182,7 @@ class XMMSimulator(object):
 
         thetas = np.linspace(0., 22., nthetas)
 
-        theta_image = np.hypot(x - cx, y - cy) * self.pixsize  # arcmin
+        theta_image = np.hypot(x - cx, y - cy) * self.pixsize_ori  # arcmin
 
         #nene_ori = self.box.shape[2]
         nene_ori = self.boxshape2

@@ -70,7 +70,7 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
     xori = np.arange(0, xmmsim.box.shape[1], 1)
     yori = np.arange(0, xmmsim.box.shape[0], 1)
 
-    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[1] # arcmin
+    #pixsize_ori = xmmsim.box_size / xmmsim.box.shape[1] # arcmin
 
     cx, cy = npix_out / 2., npix_out / 2.
 
@@ -104,7 +104,7 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
 
         modphabs.NH = NH
 
-        modsource = pixsize_ori**2 * (modlhb + modphabs * (modgh + modcxb))
+        modsource = xmmsim.pixsize_ori**2 * (modlhb + modphabs * (modgh + modcxb))
 
         skybkg_spectrum = modsource(xmmsim.box_ene_mean)
 
@@ -121,9 +121,9 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
 
     nene = len(ene) - 1
 
-    xnew = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
+    xnew = (np.arange(0, npix_out, 1) - cx) * pixsize / xmmsim.pixsize_ori
 
-    ynew = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
+    ynew = (np.arange(0, npix_out, 1) - cy) * pixsize / xmmsim.pixsize_ori
 
     phot_box_ima = np.empty((npix_out,npix_out,nene))
 
@@ -138,7 +138,7 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
 
         finterp = RectBivariateSpline(yori - cy_ori, xori - cx_ori, ima.T)
 
-        ima_newpix = finterp(xnew, ynew).T * (pixsize / pixsize_ori)**2 # phot/cm2/s/keV
+        ima_newpix = finterp(xnew, ynew).T * (pixsize / xmmsim.pixsize_ori)**2 # phot/cm2/s/keV
 
         phot_box_ima[:,:,i] = psf_convole(ima_newpix, pixsize, xmmsim) * mask
 
@@ -201,7 +201,7 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
     yori = np.arange(0, xmmsim.boxshape0, 1)
 
     #pixsize_ori = xmmsim.box_size / xmmsim.box.shape[1] # arcmin
-    pixsize_ori = xmmsim.box_size / xmmsim.boxshape1 # arcmin
+    #pixsize_ori = xmmsim.box_size / xmmsim.boxshape1 # arcmin
 
     cx, cy = npix_out / 2., npix_out / 2.
 
@@ -235,7 +235,7 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
 
         modphabs.NH = NH
 
-        modsource = pixsize_ori**2 * (modlhb + modphabs * (modgh + modcxb))
+        modsource = xmmsim.pixsize_ori**2 * (modlhb + modphabs * (modgh + modcxb))
 
         skybkg_spectrum = modsource(xmmsim.box_ene_mean)
 
@@ -255,9 +255,9 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
 
     nene = len(ene) - 1
 
-    xnew = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
+    xnew = (np.arange(0, npix_out, 1) - cx) * pixsize / xmmsim.pixsize_ori
 
-    ynew = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
+    ynew = (np.arange(0, npix_out, 1) - cy) * pixsize / xmmsim.pixsize_ori
 
     phot_box_ima = np.empty((npix_out,npix_out,nene))
 
@@ -274,7 +274,7 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
 
         finterp = RectBivariateSpline(yori - cy_ori, xori - cx_ori, ima.T)
 
-        ima_newpix = finterp(xnew, ynew).T * (pixsize / pixsize_ori)**2 # phot/cm2/s/keV
+        ima_newpix = finterp(xnew, ynew).T * (pixsize / xmmsim.pixsize_ori)**2 # phot/cm2/s/keV
 
         phot_box_ima[:,:,i] = psf_convole(ima_newpix, pixsize, xmmsim) * mask
 
@@ -357,19 +357,19 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
     #and also shift 0,0 coordinates in x_pix to the central 256,256 pixel
     ra_evt = np.array(f_pyxsim['data']['xsky'][()])
     dec_evt = np.array(f_pyxsim['data']['ysky'][()])
-    x_pix = np.array(f_pyxsim['data']['xsky'][()]*60./pixsize_ori + xoffset, dtype=int)
-    y_pix = np.array(f_pyxsim['data']['ysky'][()]*60./pixsize_ori + yoffset, dtype=int)
+    x_pix = np.round(f_pyxsim['data']['xsky'][()]*60./xmmsim.pixsize_ori + xoffset).astype(int)
+    y_pix = np.round(f_pyxsim['data']['ysky'][()]*60./xmmsim.pixsize_ori + yoffset).astype(int)
     energy = f_pyxsim['data']['eobs'][()]
 
     #prepare arrays to output pixels and energy of cluster evts
-    X_clu, Y_clu, chan_evt_clu = np.array([]), np.array([]), np.array([])
+    X_clu, Y_clu, chan_evt_clu = [], [], []
     #Loop on the output pixels
     print('Working on CLU...')
     print('EFFAREA:', eff_area)
     print('Nevt to start:', len(energy))
 
     print('pixsize',pixsize)
-    print('pixsize_ori',pixsize_ori)
+    print('pixsize_ori',xmmsim.pixsize_ori)
 
     for ii,xx in tqdm(enumerate(xori), total=len(xori)): #loop on xori because that's where the arf is computed
         for jj,yy in enumerate(yori):
@@ -393,26 +393,31 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
 
                     #select fraction of evts based on ARFs ratio and texp ratio
                     selfrac = xmmsim.all_arfs[yy,xx,kk]/eff_area * tsim/texp_evt #make sure you select correct arf here
+                    #selfrac=0.1
                     N_evts_out = np.random.poisson(len(evts_this_ene)*selfrac )
                     #N_evts_out = int( len(evts_this_ene)*selfrac )
                     #if xmmsim.all_arfs[ii,jj,kk]>100:
                         #print('ARF_here:', xmmsim.all_arfs[ii,jj,kk])
                         #print('ARFs ratio:', xmmsim.all_arfs[ii,jj,kk]/eff_area, 'texp_ratio:', tsim/texp_evt)
                         #print(selfrac, N_evts_out)
-                    ids = np.random.choice(range(len(evts_this_ene)), size=N_evts_out, replace=True)
+                    if N_evts_out>len(evts_this_ene):
+                        replace = True
+                    else:
+                        replace = False
+                    ids = np.random.choice(range(len(evts_this_ene)), size=N_evts_out, replace=replace)
                     evts_clu_out = evts_this_ene[ids]
                     if len(evts_clu_out)>0:
                         #print('      Nevt after arfs,exp cut:', len(evts_clu_out))
 
                         #Loop on evts to apply rmf
-                        evts_clu_out_rmf = np.zeros_like(evts_clu_out)
+                        evts_clu_out_rmf = []
                         for aa,evt in enumerate(evts_clu_out):
                             channel = rmf.energy_to_channel(evt)
                             prob_dist = rmf.matrix.T[channel]  #or rmf.matrix.T ? Confirmed with Eckert, it's .T (P(E) tail at low E)
                             # Normalize probabilities
                             prob_dist /= np.sum(prob_dist)
                             # Sample new energy based on the probability distribution
-                            evts_clu_out_rmf[aa] = np.random.choice(emb, p=prob_dist)
+                            evts_clu_out_rmf.append(np.random.choice(emb, p=prob_dist))
                         ra_pix_out = ra_pix_ene[ids]
                         dec_pix_out = dec_pix_ene[ids]
 
@@ -424,10 +429,18 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
                         #print('xx_out:',xx_out)
                         #print('yy:',yy)
                         #print('yy_out:',yy_out)
-                        X_clu = np.append(X_clu, xx_out)
-                        Y_clu = np.append(Y_clu, yy_out)
-                        chan_evt_clu = np.append(chan_evt_clu, evts_clu_out_rmf)
+                        X_clu.append(xx_out)
+                        Y_clu.append(yy_out)
+                        chan_evt_clu.append(evts_clu_out_rmf)
+                        #X_clu = np.append(X_clu, xx_out)
+                        #Y_clu = np.append(Y_clu, yy_out)
+                        #chan_evt_clu = np.append(chan_evt_clu, evts_clu_out_rmf)
         print('Cumulative N CLU evt pix:', len(X_clu))
+
+    # Concatenate
+    X_clu = np.concatenate(X_clu)
+    Y_clu = np.concatenate(Y_clu)
+    chan_evt_clu = np.concatenate(chan_evt_clu)
 
     #Add PSF
     print('Xclu', X_clu)
