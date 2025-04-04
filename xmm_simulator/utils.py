@@ -248,7 +248,7 @@ def set_wcs(xmmsim, type='mask'):
     if type == 'box':
         pixsize_ori = xmmsim.box_size / 60. / xmmsim.boxshape1  # degree
 
-        if xmmsim.box:
+        if xmmsim.box is not None:
             ima = xmmsim.box[:, :, 0]
             hdu = fits.PrimaryHDU(ima)
             header = hdu.header
