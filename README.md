@@ -17,6 +17,11 @@ A directory containing the XMM calibration files (CCF) must also be available, s
 
 https://www.cosmos.esa.int/web/xmm-newton/current-calibration-files
 
+The xmm_simulator works with two set-ups, the first one is  with data cubes containing a model spectrum in unit of photons/cm2/s/keV for each image pixel.
+The second one is with a list of idealized events, generated for example with pyxsim.
+The set up is very similar, you just need to provide the box file or the event file in the proper keywords when defining the XMMSimulator class. An example is below.
+
+
 ## Initialization
 
 The xmm_simulator code is meant to work with data cubes containing a model spectrum in unit of photons/cm2/s/keV for each image pixel. The data cube must be of size N_ene x Npix_x x Npix_y , with N_ene the number of energy bins in the model spectrum, and Npix_x, Npix_y the number of input image pixels on the X and Y axes. The box size (in degrees) and the energy band definition must be provided by the user.
@@ -24,7 +29,18 @@ The xmm_simulator code is meant to work with data cubes containing a model spect
 To initiate the code, do the following:
 
     import xmm_simulator
+
+    #Working with data cubes
     xmmsim = xmm_simulator.XMMSimulator(boxfile='/path/to/data_cube',
+                                        ccfpath='/path/to/ccf/',
+                                        instrument='MOS1', # one constructor per instrument, can be 'MOS1', 'MOS2', or 'PN'
+                                        tsim=25000, # simulation exposure time
+                                        box_size=0.5, # size of provided image in degrees
+                                        box_ene=None # numpy array containing the energy definition, i.e. it must have a size of N_ene+1 to contain the lower and upper boundaries of energy channels
+                                        )
+
+    #Working with idealized events
+    xmmsim = xmm_simulator.XMMSimulator(eventfile_input='/path/to/event_file',
                                         ccfpath='/path/to/ccf/',
                                         instrument='MOS1', # one constructor per instrument, can be 'MOS1', 'MOS2', or 'PN'
                                         tsim=25000, # simulation exposure time

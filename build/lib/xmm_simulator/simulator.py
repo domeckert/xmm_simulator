@@ -6,7 +6,7 @@ from .background import gen_qpb_image, gen_skybkg_image, gen_skybkg_spectrum, ge
 from .utils import get_ccf_file_names, calc_arf, get_data_file_path
 from .imaging import gen_image_box, save_maps, exposure_map
 from .spectral import gen_spec_box, save_spectrum, gen_spec_evt, gen_spec_evt_pix
-from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt, load_events
+from .event_file import gen_phot_box, gen_evt_list, gen_qpb_evt, merge_evt, save_evt_file, gen_image_evt, load_events, gen_phot_evtlist
 from .point_sources import gen_sources, pts_box
 from scipy.interpolate import interp1d
 
@@ -14,8 +14,8 @@ class XMMSimulator(object):
     """
 
     """
-    def __init__(self, boxfile, ccfpath, instrument, tsim,
-                 box_size=0.5, box_ene=None, abund='angr'):
+    def __init__(self, ccfpath, instrument, tsim, boxfile=None,
+                 evtfile_input=None, box_size=0.5, box_ene=None, abund='angr'):
         """
         Constructor of class XMMSimulator
 
@@ -27,6 +27,8 @@ class XMMSimulator(object):
         :type instrument: str
         :param tsim: Simulation exposure time
         :type tsim: float
+        :param evtfile_input: Input event file (in the format of output event file from pyxsim)
+        :type evtfile_input: str
         :param box_size: Size of the provided simulation box in degrees (defaults to 0.5)
         :type box_size: float
         :param box_ene: Numpy array containing the energy definition of the box. If None, defaults to a linear grid between 0.1 and 10 keV with a step of 0.02
@@ -43,20 +45,49 @@ class XMMSimulator(object):
             print('ERROR: instrument should be one of PN, MOS1, or MOS2')
             return
 
-        fb = fits.open(boxfile)
+        try:
+            if boxfile is None and evtfile_input is None:
+                raise ValueError
+        except ValueError:
+            print('ERROR: you need to provide at least a path to a boxfile or a path to an input eventfile')
 
-        self.box = fb[0].data
+        try:
+            if boxfile is not None and evtfile_input is not None:
+                raise ValueError
+        except ValueError:
+            print('ERROR: you provided a path to a boxfile and a path to an input eventfile. Choose one of the two')
 
-        self.box_size = box_size * 60. # arcmin
 
-        fb.close()
+        self.box_size = box_size * 60.  # arcmin
+        if boxfile:
+            fb = fits.open(boxfile)
+
+            self.box = fb[0].data
+
+            self.pixsize_ori = self.box_size / self.box.shape[0]
+
+            self.boxshape0 = self.box.shape[0]
+            self.boxshape1 = self.box.shape[1]
+            self.boxshape2 = self.box.shape[2]
+
+            fb.close()
+            self.evtfile_input = None
+        else:
+            self.box = None
+            self.evtfile_input = evtfile_input
+            self.boxshape0 = 512#512
+            self.boxshape1 = 512#512
+            self.boxshape2 = 495#495
+            self.pixsize_ori = self.box_size / self.boxshape0
+
 
         if box_ene is None:
-            self.box_ene = np.arange(0.1, 10.01, 0.02)
-
-            self.box_ene_mean = np.arange(0.11, 10., 0.02)
-
-            self.box_ene_width = 0.02
+            #self.box_ene = np.arange(0.1, 10.01, 0.02)
+            #self.box_ene_mean = np.arange(0.11, 10., 0.02)
+            #self.box_ene_width = 0.02
+            self.box_ene = np.linspace(0.1, 10.01, self.boxshape2+1)
+            self.box_ene_mean = np.linspace(0.11, 10., self.boxshape2)
+            self.box_ene_width = np.diff(self.box_ene_mean)[0]
         else:
             self.box_ene = box_ene
 
@@ -135,12 +166,14 @@ class XMMSimulator(object):
         Compute the ARFs for each point on the box
 
         """
+        #redefined by rseppi as self.pixsize_ori
+        #pixsize = self.box_size / self.box.shape[0]  # by default box size is 30 arcmin
 
-        pixsize = self.box_size / self.box.shape[0]  # by default box size is 30 arcmin
+        #y, x = np.indices(self.box[:, :, 0].shape)
+        y, x = np.indices((self.boxshape0, self.boxshape1))
 
-        y, x = np.indices(self.box[:, :, 0].shape)
-
-        cx, cy = self.box.shape[0] / 2., self.box.shape[1] / 2.
+        #cx, cy = self.box.shape[0] / 2., self.box.shape[1] / 2.
+        cx, cy = self.boxshape0 / 2., self.boxshape1 / 2.
 
         self.cx = cx
         self.cy = cy
@@ -149,9 +182,10 @@ class XMMSimulator(object):
 
         thetas = np.linspace(0., 22., nthetas)
 
-        theta_image = np.hypot(x - cx, y - cy) * pixsize  # arcmin
+        theta_image = np.hypot(x - cx, y - cy) * self.pixsize_ori  # arcmin
 
-        nene_ori = self.box.shape[2]
+        #nene_ori = self.box.shape[2]
+        nene_ori = self.boxshape2
 
         ene_lo, ene_hi = self.box_ene[:nene_ori], self.box_ene[1:]
 
@@ -562,21 +596,36 @@ class XMMSimulator(object):
         :param NH: Absorption column density
         :type NH: float
         """
+        if self.box:
+            print('# Compute model box...')
+            phot_box_ima = gen_phot_box(self,
+                                        tsim=self.tsim,
+                                        with_skybkg=withskybkg,
+                                        lhb=lhb,
+                                        ght=ght,
+                                        ghn=ghn,
+                                        cxb=cxb,
+                                        NH=NH,
+                                        abund=self.abund)
 
-        print('# Compute model box...')
-        phot_box_ima = gen_phot_box(self,
-                                    tsim=self.tsim,
-                                    with_skybkg=withskybkg,
-                                    lhb=lhb,
-                                    ght=ght,
-                                    ghn=ghn,
-                                    cxb=cxb,
-                                    NH=NH,
-                                    abund=self.abund)
+            print('# Generate sky events...')
+            X_evt, Y_evt, chan_evt = gen_evt_list(self,
+                                                  phot_box_ima=phot_box_ima)
 
-        print('# Generate sky events...')
-        X_evt, Y_evt, chan_evt = gen_evt_list(self,
-                                              phot_box_ima=phot_box_ima)
+        elif self.evtfile_input:
+            X_evt, Y_evt, chan_evt = gen_phot_evtlist(self,
+                                                      tsim=self.tsim,
+                                                      with_skybkg=withskybkg,
+                                                      lhb=lhb,
+                                                      ght=ght,
+                                                      ghn=ghn,
+                                                      cxb=cxb,
+                                                      NH=NH,
+                                                      abund=self.abund)
+
+        else:
+            print('You need to provide either a box or an ideal event file.')
+            return
 
         if self.fwc_spec is None:
             print('FWC events not extracted yet, skipping QPB event generation')
