@@ -596,7 +596,7 @@ class XMMSimulator(object):
         :param NH: Absorption column density
         :type NH: float
         """
-        if self.box:
+        if self.box is not None:
             print('# Compute model box...')
             phot_box_ima = gen_phot_box(self,
                                         tsim=self.tsim,
