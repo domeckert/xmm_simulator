@@ -136,14 +136,16 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
 
     pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
 
-    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
+    #available as self.pixsize_ori after implementation with evtfile by rseppi
+    #pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
 
     npix_out = mask.shape[0]
 
     inmask.close()
 
     # Set region definition
-    y, x = np.indices(xmmsim.box[:, :, 0].shape)
+    #y, x = np.indices(xmmsim.box[:, :, 0].shape)
+    y, x = np.indices((xmmsim.boxshape0, xmmsim.boxshape1))
 
     wcs_mask = set_wcs(xmmsim=xmmsim, type='mask')
 
@@ -165,15 +167,15 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
 
     thetas = np.hypot(xmmsim.X_evt - xsrc, xmmsim.Y_evt - ysrc) * pixsize  # arcmin
 
-    thetas_ima = np.hypot(x - xsrc_box, y - ysrc_box) * pixsize_ori
+    thetas_ima = np.hypot(x - xsrc_box, y - ysrc_box) * xmmsim.pixsize_ori
 
     # Recast mask shape into box image shape
     cx, cy = npix_out / 2., npix_out / 2.
-    cx_box, cy_box = xmmsim.box.shape[1] / 2., xmmsim.box.shape[0] / 2.
-    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
-    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
-    xbox = np.arange(0, xmmsim.box.shape[1], 1) - cx_box
-    ybox = np.arange(0, xmmsim.box.shape[0], 1) - cy_box
+    cx_box, cy_box = xmmsim.boxshape1 / 2., xmmsim.boxshape0 / 2.
+    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / xmmsim.pixsize_ori
+    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / xmmsim.pixsize_ori
+    xbox = np.arange(0, xmmsim.boxshape1, 1) - cx_box
+    ybox = np.arange(0, xmmsim.boxshape1, 1) - cy_box
 
     finterp = RectBivariateSpline(ymask, xmask, mask)
 
@@ -193,7 +195,7 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
         thetas_ima = region(regfile=regfile,
                             thetas=thetas_ima,
                             wcs_inp=wcs_box,
-                            pixsize=pixsize_ori)
+                            pixsize=xmmsim.pixsize_ori)
 
     test_annulus = np.where(np.logical_and(thetas >= rin, thetas < rout))
 
@@ -210,15 +212,16 @@ def gen_spec_evt(xmmsim, cra, cdec, rin, rout, regfile=None):
     # Compute BACKSCAL
     sel_area = np.where(np.logical_and(thetas_ima >= rin, thetas_ima < rout))
 
-    backscal_annulus = len(sel_area[0]) * (pixsize_ori * 60.) ** 2 / (0.05 ** 2)
+    backscal_annulus = len(sel_area[0]) * (xmmsim.pixsize_ori * 60.) ** 2 / (0.05 ** 2)
 
     # Compute ARF
     arfs_sel = xmmsim.all_arfs[sel_area]
 
-    box_sel = xmmsim.box[sel_area]
-
-    if np.sum(box_sel) == 0:
-        box_sel = np.ones(len(arfs_sel))
+    #not needed after evtfile option from rseppi
+    #box_sel = xmmsim.box[sel_area]
+    #if np.sum(box_sel) == 0:
+    #    box_sel = np.ones(len(arfs_sel))
+    box_sel = np.ones(len(arfs_sel))
 
     arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
 
@@ -261,10 +264,10 @@ def gen_spec_evt_pix(xmmsim, pixlist):
     mask = inmask[1].data
 
     pixsize = inmask[1].header['CDELT2'] * 60.  # arcmin
-    pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
+    #pixsize_ori = xmmsim.box_size / xmmsim.box.shape[0]  # arcmin
 
     #Pavement for the original box (e.g. 512x512)
-    xx_origin, yy_origin = np.meshgrid(np.arange(xmmsim.box.shape[0]), np.arange(xmmsim.box.shape[1]))
+    xx_origin, yy_origin = np.meshgrid(np.arange(xmmsim.boxshape0), np.arange(xmmsim.boxshape1))
 
     npix_out = mask.shape[0]
     inmask.close()
@@ -277,11 +280,11 @@ def gen_spec_evt_pix(xmmsim, pixlist):
 
     # Recast mask shape into box image shape
     cx, cy = npix_out / 2., npix_out / 2.
-    cx_box, cy_box = xmmsim.box.shape[1] / 2., xmmsim.box.shape[0] / 2.
-    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / pixsize_ori
-    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / pixsize_ori
-    xbox = np.arange(0, xmmsim.box.shape[1], 1) - cx_box
-    ybox = np.arange(0, xmmsim.box.shape[0], 1) - cy_box
+    cx_box, cy_box = xmmsim.boxshape1 / 2., xmmsim.boxshape0 / 2.
+    xmask = (np.arange(0, npix_out, 1) - cx) * pixsize / xmmsim.pixsize_ori
+    ymask = (np.arange(0, npix_out, 1) - cy) * pixsize / xmmsim.pixsize_ori
+    xbox = np.arange(0, xmmsim.boxshape1, 1) - cx_box
+    ybox = np.arange(0, xmmsim.boxshape0, 1) - cy_box
 
     finterp = RectBivariateSpline(ymask, xmask, mask)
 
@@ -321,12 +324,15 @@ def gen_spec_evt_pix(xmmsim, pixlist):
         [tuple(pix) in pixels_set_orig for pix in np.vstack([xx_origin.ravel(), yy_origin.ravel()]).T]).reshape(
         xx_origin.shape)
     sel_area = np.where(sel_area_)
-    backscal_pixels = len(sel_area[0]) * (pixsize_ori * 60.) ** 2 / (0.05 ** 2)
+    backscal_pixels = len(sel_area[0]) * (xmmsim.pixsize_ori * 60.) ** 2 / (0.05 ** 2)
 
     # Compute ARF
     arfs_sel = xmmsim.all_arfs[sel_area]
-    box_sel = xmmsim.box[sel_area]
-    if np.sum(box_sel) == 0:
+    if xmmsim.box is not None:
+        box_sel = xmmsim.box[sel_area]
+        if np.sum(box_sel) == 0:
+            box_sel = np.ones(len(arfs_sel))
+    else:
         box_sel = np.ones(len(arfs_sel))
 
     arf_mean = np.average(arfs_sel, axis=0, weights=box_sel)
