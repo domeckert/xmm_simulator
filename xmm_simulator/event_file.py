@@ -1,3 +1,5 @@
+import sys
+
 import numpy as np
 from astropy.io import fits
 from .utils import get_data_file_path
@@ -148,18 +150,19 @@ def gen_phot_box(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=None, c
     return phot_box_ima
 
 
-def sample_rmf(energies, energy_to_channel, rmf_matrix_transposed, emb):
+def sample_rmf(energies, mc_ene_edges, rmf_matrix, emb):
     '''
     Function to convolve an array of energies with the RMF
     '''
     evts_clu_out_rmf = np.empty(len(energies), dtype=emb.dtype)
     for bb, evt in enumerate(energies):
-        channel = energy_to_channel(evt)
-        prob_dist = rmf_matrix_transposed[channel]  # or rmf.matrix.T ? Confirmed with Eckert, it's .T (P(E) tail at low E)
-        # Normalize probabilities
+        k = np.searchsorted(mc_ene_edges, evt, side='right')-1
+        k = np.clip(k, 0, len(mc_ene_edges)-2)
+
+        prob_dist = rmf_matrix.T[k]
         prob_dist /= np.sum(prob_dist)
-        # Sample new energy based on the probability distribution
         evts_clu_out_rmf[bb] = np.random.choice(emb, p=prob_dist)
+
     return evts_clu_out_rmf
 
 
@@ -203,10 +206,9 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
     rmf = OGIPResponse(rsp_file=rmf_file)
     nchan = len(rmf.monte_carlo_energies) - 1
     mc_ene = (rmf.monte_carlo_energies[:nchan] + rmf.monte_carlo_energies[1:]) / 2.
+    mc_ene_edges = rmf.monte_carlo_energies
     bin_width = rmf.monte_carlo_energies[1:] - rmf.monte_carlo_energies[:nchan]
     emb = (rmf.ebounds[1:] + rmf.ebounds[:-1]) / 2.
-    ene_to_chan = rmf.energy_to_channel
-    rmf_mat_T = rmf.matrix.T
 
     # Get mask file
     mask_file = get_data_file_path('imgs/%s_mask.fits.gz' % (xmmsim.instrument))
@@ -356,12 +358,24 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
     #Let's add the cluster events by downgrading pyxsim input events
     #Read evtfile from pyxsim and its properties
     t0 = time.time()
-    with h5.File(xmmsim.evtfile_input, 'r') as f_pyxsim:
-        eff_area = f_pyxsim['parameters']['area'][()]
-        texp_evt = f_pyxsim['parameters']['exp_time'][()]
-        x_pix_out = np.floor(f_pyxsim['data']['xsky'][()] * 60. / pixsize + cx).astype(int)
-        y_pix_out = np.floor(f_pyxsim['data']['ysky'][()] * 60. / pixsize + cy).astype(int)
-        energy = f_pyxsim['data']['eobs'][()]
+    if xmmsim.evtfile_input.endswith('.h5') or xmmsim.evtfile_input.endswith('.hdf5'):
+        with h5.File(xmmsim.evtfile_input, 'r') as f_pyxsim:
+            eff_area = f_pyxsim['parameters']['area'][()]
+            texp_evt = f_pyxsim['parameters']['exp_time'][()]
+            x_pix_out = np.floor(f_pyxsim['data']['xsky'][()] * 60. / pixsize + cx).astype(int)
+            y_pix_out = np.floor(f_pyxsim['data']['ysky'][()] * 60. / pixsize + cy).astype(int)
+            energy = f_pyxsim['data']['eobs'][()]
+    elif xmmsim.evtfile_input.endswith('.fits') or xmmsim.evtfile_input.endswith('.fit'):
+        hdul = fits.open(xmmsim.evtfile_input)
+        eff_area = hdul[0].header['AREA']
+        texp_evt = hdul[0].header['TIME']
+        x_pix_out = np.floor( (hdul[2].data['RA']-np.median(hdul[2].data['RA'])) * 60. / pixsize + cx).astype(int)
+        y_pix_out = np.floor( (hdul[2].data['DEC']-np.median(hdul[2].data['DEC'])) * 60. / pixsize + cy).astype(int)
+        energy = hdul[2].data['ENERGY']
+    else:
+        print(xmmsim.evtfile_input, 'is not .h5, .hdf5, .fits, .fit!')
+        sys.exit()
+
     texp_ratio = tsim / texp_evt
 
     xoffset = int(xori[int(len(xori)/2.)])
@@ -453,18 +467,26 @@ def gen_phot_evtlist(xmmsim, tsim, with_skybkg=True, lhb=None, ght=None, ghn=Non
 
                 #select fraction of evts based on ARFs ratio and texp ratio
                 selfrac = xmmsim.all_arfs[yy,xx,kk]/eff_area * texp_ratio #make sure you select correct arf here
-                N_evts_out = np.random.poisson(len(evts_this_ene)*selfrac )
-                if N_evts_out>len(evts_this_ene):
-                    replace = True
-                else:
-                    replace = False
-                ids = np.random.choice(range(len(evts_this_ene)), size=N_evts_out, replace=replace)
-                final_idx = sel_idx[ids]
-                evts_clu_out = evts_this_ene[ids]
+
+                #old poisson approach
+                #N_evts_out = np.random.poisson(len(evts_this_ene)*selfrac )
+                #if N_evts_out>len(evts_this_ene):
+                #    replace = True
+                #else:
+                #    replace = False
+                #ids = np.random.choice(range(len(evts_this_ene)), size=N_evts_out, replace=replace)
+                #final_idx = sel_idx[ids]
+                #evts_clu_out = evts_this_ene[ids]
+
+                #new binomial thinning
+                n = len(evts_this_ene)
+                keep = np.random.rand(n) < selfrac
+                final_idx = sel_idx[keep]
+                evts_clu_out = evts_this_ene[keep]
+
                 if len(evts_clu_out)>0:
                     #Loop on evts to apply rmf
-                    evts_clu_out_rmf = sample_rmf(evts_clu_out, ene_to_chan, rmf_mat_T, emb)
-
+                    evts_clu_out_rmf = sample_rmf(evts_clu_out, mc_ene_edges, rmf.matrix, emb)
                     xx_out = x_clu_blurred_pix[final_idx]
                     yy_out = y_clu_blurred_pix[final_idx]
                     X_clu.append(xx_out)
